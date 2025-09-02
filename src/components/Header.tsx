@@ -1,12 +1,12 @@
 import React from 'react';
 import { LogOut, User, Building2, MapPin } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuthStore } from '../lib/store';
 
 export function Header() {
-  const { user, userProfile, signOut } = useAuth();
+  const { user,setUser } = useAuthStore();
 
   const handleSignOut = async () => {
-    await signOut();
+    await setUser();
   };
 
   return (
@@ -23,15 +23,15 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-4">
-          {userProfile && (
+          {user && (
             <div className="hidden sm:flex items-center gap-4 text-sm text-gray-600">
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4" />
-                <span>Org: {userProfile.organization_id}</span>
+                <span>Org: {user?.organization_id}</span>
               </div>
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4" />
-                <span>Location: {userProfile.location_id}</span>
+                <span>Location: {user?.location_id}</span>
               </div>
             </div>
           )}

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Building2, MapPin, Calendar, Search, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../hooks/useAuth';
+// import { useAuth } from '../hooks/useAuth';
+import { useAuthStore } from '../lib/store';
 
 interface Account {
   id: string;
@@ -17,10 +18,10 @@ export function AccountsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const { userProfile } = useAuth();
+  const { user } = useAuthStore();
 
   const fetchAccounts = async () => {
-    if (!userProfile) return;
+    if (!user) return;
 
     try {
       setLoading(true);
@@ -30,8 +31,8 @@ export function AccountsList() {
         .schema('external')
         .from('accounts')
         .select('*')
-        .eq('organization_id', userProfile.organization_id)
-        .eq('location_id', userProfile.location_id)
+        // .eq('organization_id', user?.organization_id)
+        // .eq('location_id', user?.location_id)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -49,7 +50,7 @@ export function AccountsList() {
 
   useEffect(() => {
     fetchAccounts();
-  }, [userProfile]);
+  }, [user]);
 
   const filteredAccounts = accounts.filter(account =>
     account.name.toLowerCase().includes(searchTerm.toLowerCase())

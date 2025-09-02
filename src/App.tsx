@@ -3,15 +3,16 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { LoginForm } from './components/LoginForm';
 import { Dashboard } from './components/Dashboard';
 import { LoadingSpinner } from './components/LoadingSpinner';
+import { useAuthStore } from './lib/store';
 
 function AppContent() {
-  const { session, loading } = useAuth();
+  const { user } = useAuthStore();
 
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
-  if (!session) {
+  // if (loading) {
+  //   return <LoadingSpinner />;
+  // }
+console.log("uz",user);
+  if (!user) {
     return <LoginForm />;
   }
 
@@ -20,9 +21,9 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
+    // <AuthProvider>
       <AppContent />
-    </AuthProvider>
+    // </AuthProvider>
   );
 }
 

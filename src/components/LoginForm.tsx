@@ -1,19 +1,51 @@
 import React, { useState } from 'react';
 import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
+// import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../lib/store';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { signIn } = useAuth();
+  const { setUser } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-
+    const fetchUserProfile = async (authId: string) => {
+        try {
+          console.log("ix",authId);
+          const { data, error } = await supabase
+            .schema('external')
+            .from('accounts')
+            // .schema('identity')
+            // .from('users')
+            .select('*');
+            // .eq('auth_id', authId);
+            console.log("iz",data);
+    
+          if (error) {
+            console.error('Error fetching user profile:', error);
+          } else {
+            setUser(data);
+          }
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+    const signIn = async (email: string, password: string) => {
+        const { data,error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        fetchUserProfile(data.user.id);
+        return { error };
+      };
     const { error } = await signIn(email, password);
     
     if (error) {

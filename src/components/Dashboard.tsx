@@ -1,13 +1,14 @@
 import React from 'react';
 import { Header } from './Header';
 import { AccountsList } from './AccountsList';
-import { useAuth } from '../hooks/useAuth';
+// import { useAuth } from '../hooks/useAuth';
 import { Building2, MapPin, User } from 'lucide-react';
+import { useAuthStore } from '../lib/store';
 
 export function Dashboard() {
-  const { userProfile } = useAuth();
+  const { user } = useAuthStore();
 
-  if (!userProfile) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
@@ -38,14 +39,14 @@ export function Dashboard() {
               <Building2 className="w-8 h-8 text-blue-600" />
               <div>
                 <p className="text-sm font-medium text-blue-900">Organization</p>
-                <p className="text-lg font-semibold text-blue-700">{userProfile.organization_id}</p>
+                <p className="text-lg font-semibold text-blue-700">{user?.organization_id}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
               <MapPin className="w-8 h-8 text-green-600" />
               <div>
                 <p className="text-sm font-medium text-green-900">Location</p>
-                <p className="text-lg font-semibold text-green-700">{userProfile.location_id}</p>
+                <p className="text-lg font-semibold text-green-700">{user?.location_id}</p>
               </div>
             </div>
           </div>
