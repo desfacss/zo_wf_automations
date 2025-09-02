@@ -19,18 +19,15 @@ export function LoginForm() {
         try {
           console.log("ix",authId);
           const { data, error } = await supabase
-            .schema('external')
-            .from('accounts')
-            // .schema('identity')
-            // .from('users')
-            .select('*');
-            // .eq('auth_id', authId);
-            console.log("iz",data);
+            .schema('identity')
+            .from('users')
+            .select('*')
+            .eq('auth_id', authId);
     
           if (error) {
             console.error('Error fetching user profile:', error);
           } else {
-            setUser(data);
+            setUser(data[0]);
           }
         } catch (error) {
           console.error('Error fetching user profile:', error);

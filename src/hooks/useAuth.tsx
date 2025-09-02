@@ -30,7 +30,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("i1");
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -39,12 +38,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
     });
-    
+
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("i2");
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -61,15 +59,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (authId: string) => {
     try {
-      console.log("ix",authId);
       const { data, error } = await supabase
-        .schema('external')
-        .from('accounts')
-        // .schema('identity')
-        // .from('users')
-        .select('*');
-        // .eq('auth_id', authId);
-        console.log("iz",data);
+        .schema('identity')
+        .from('users')
+        .select('*')
+        .eq('auth_id', authId)
+        .single();
 
       if (error) {
         console.error('Error fetching user profile:', error);
