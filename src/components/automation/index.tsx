@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Settings, Zap, Play, Pause, Edit, Trash2, Eye, Activity } from 'lucide-react';
+import { Plus, Settings, Zap, Play, Pause, Edit, Trash2, Eye, Activity, Clock } from 'lucide-react';
 import { WorkflowWizard } from './WorkflowWizard';
+import { WorkflowLogsView } from './WorkflowLogsView';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
 import type { WorkflowRule } from '../../lib/types';
@@ -12,6 +13,7 @@ export function AutomationDashboard() {
   const [error, setError] = useState('');
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingWorkflowId, setEditingWorkflowId] = useState<string | undefined>();
+  const [viewingLogsWorkflow, setViewingLogsWorkflow] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     loadWorkflows();
@@ -84,6 +86,14 @@ export function AutomationDashboard() {
     setIsWizardOpen(true);
   };
 
+  const openLogsView = (workflowId: string, workflowName: string) => {
+    setViewingLogsWorkflow({ id: workflowId, name: workflowName });
+  };
+
+  const closeLogsView = () => {
+    setViewingLogsWorkflow(null);
+  };
+
   const handleWizardClose = () => {
     setIsWizardOpen(false);
     setEditingWorkflowId(undefined);
@@ -112,6 +122,17 @@ export function AutomationDashboard() {
     };
     return colors[type as keyof typeof colors] || 'gray';
   };
+
+  // Show logs view if selected
+  if (viewingLogsWorkflow) {
+    return (
+      <WorkflowLogsView
+        workflowId={viewingLogsWorkflow.id}
+        workflowName={viewingLogsWorkflow.name}
+        onBack={closeLogsView}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -210,6 +231,14 @@ export function AutomationDashboard() {
                   </div>
 
                   <div className="flex items-center gap-2 ml-4">
+                    <button
+                      onClick={() => openLogsView(workflow.id!, workflow.name)}
+                      className="text-gray-600 hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                      title="View logs"
+                    >
+                      <Clock className="w-4 h-4" />
+                    </button>
+                    
                     <button
                       onClick={() => toggleWorkflowStatus(workflow.id!, workflow.is_active!)}
                       className={`p-2 rounded-lg transition-colors ${

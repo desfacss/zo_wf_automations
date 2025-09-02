@@ -156,10 +156,10 @@ export function WorkflowConditions({ workflow, onUpdate, availableTables }: Work
     onUpdate({ ...workflow, conditions: conditionsObject });
   };
 
-  useEffect(() => {
-    updateWorkflowConditions();
-  }, [conditions]);
-
+  // useEffect(() => {
+  //   updateWorkflowConditions();
+  // }, [conditions]);
+ 
   const renderValueInput = (condition: Condition) => {
     const field = tableMetadata.find(f => f.key === condition.field);
     

@@ -4,6 +4,7 @@ import { LoginForm } from './components/LoginForm';
 import { Dashboard } from './components/Dashboard';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import {AutomationDashboard} from './components/automation/index';
+import {EventDetailsModal} from './components/automation/EventDetailsModal';
 import { useAuthStore } from './lib/store';
 
 function AppContent() {
@@ -14,7 +15,6 @@ console.log("uz",user);
     return <LoginForm />;
   }
 
-  //return <Dashboard />;
   return <AutomationDashboard/>;
 }
 

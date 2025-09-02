@@ -209,7 +209,7 @@ export const useAuthStore = create<AuthState>()(
       storage: secureStorage,
       partialize: (state) => ({
         viewPreferences: state.viewPreferences,
-        user: state.user ? { id: state.user.id, email: state.user.email } : null,
+        user: state.user ? state.user : null,
         organization: state.organization ? { id: state.organization.id, name: state.organization.name } : null,
         location: state.location ? { id: state.location.id, name: state.location.name } : null,
         permissions: state.permissions,
