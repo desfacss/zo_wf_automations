@@ -1,7 +1,19 @@
-import React, { useState } from 'react';
-import { Plus, Mail, Users, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Form, Select, Input, Button, Card, Row, Col, Typography, Space, Switch, Tag, Alert, Spin, Divider } from 'antd';
+import { PlusOutlined, MailOutlined, TeamOutlined, FileTextOutlined, UserOutlined, SafetyOutlined } from '@ant-design/icons';
 import { EmailTemplateModal } from '../EmailTemplateModal';
-import type { WorkflowRule, ViewConfig, EmailTemplate, Team, TableMetadata } from '../../../lib/types';
+import { supabase } from '../../../lib/supabase';
+import { useAuthStore } from '../../../lib/store';
+import type { WorkflowRule, ViewConfig, EmailTemplate, Team, TableMetadata, User } from '../../../lib/types';
+
+const { Title, Paragraph, Text } = Typography;
+
+interface Role {
+  id: string;
+  name: string;
+  organization_id: string;
+  location_id?: string;
+}
 
 interface EmailActionConfigProps {
   configuration: any;
@@ -20,15 +32,106 @@ export function EmailActionConfig({
   emailTemplates,
   teams,
 }: EmailActionConfigProps) {
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const { user } = useAuthStore();
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [tableMetadata, setTableMetadata] = useState<TableMetadata[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
 
-  const tableMetadata = availableTables.find(t => t.entity_type === workflow.trigger_table)?.metadata || [];
-  
-  // Get email fields from metadata
+  useEffect(() => {
+    if (workflow.trigger_table) {
+      loadTableMetadata();
+    }
+    loadRolesAndUsers();
+  }, [workflow.trigger_table, availableTables]);
+
+  const loadTableMetadata = async () => {
+    console.log('🔄 Loading table metadata for email action config, trigger_table:', workflow.trigger_table);
+    try {
+      const table = availableTables.find(t => t.entity_type === workflow.trigger_table);
+      if (table && table.metadata) {
+        console.log('✅ Found metadata in availableTables:', table.metadata.length, 'fields');
+        setTableMetadata(table.metadata);
+      } else {
+        console.log('📊 Querying y_view_config for metadata, entity_type:', workflow.trigger_table);
+        const { data, error } = await supabase
+          .from('y_view_config')
+          .select('metadata')
+          .eq('entity_type', workflow.trigger_table)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        console.log('📊 Metadata query result:', { data, error });
+        if (error) {
+          console.error('❌ Error loading metadata:', error);
+        } else if (data && data.metadata) {
+          console.log('✅ Metadata loaded from database:', data.metadata.length, 'fields');
+          setTableMetadata(data.metadata);
+        } else {
+          console.log('ℹ️ No metadata found for table:', workflow.trigger_table);
+          setTableMetadata([]);
+        }
+      }
+    } catch (err) {
+      console.error('❌ Error loading table metadata:', err);
+    }
+  };
+
+  const loadRolesAndUsers = async () => {
+    if (!user?.organization_id) return;
+
+    console.log('🔄 Loading roles and users for email action config');
+    setLoadingData(true);
+    
+    try {
+      // Load roles
+      console.log('📊 Querying identity.roles for organization_id:', user.organization_id);
+      const { data: rolesData, error: rolesError } = await supabase
+        .schema('identity')
+        .from('roles')
+        .select('id, name, organization_id, location_id')
+        .eq('organization_id', user.organization_id)
+        .eq('is_active', true)
+        .order('name');
+
+      console.log('📊 Roles query result:', { rolesData, rolesError });
+      if (rolesError) {
+        console.error('❌ Error loading roles:', rolesError);
+      } else {
+        setRoles(rolesData || []);
+        console.log('✅ Roles loaded:', rolesData?.length || 0, 'roles');
+      }
+
+      // Load users
+      console.log('📊 Querying identity.users for organization_id:', user.organization_id);
+      const { data: usersData, error: usersError } = await supabase
+        .schema('identity')
+        .from('users')
+        .select('id, name, organization_id, location_id, details')
+        .eq('organization_id', user.organization_id)
+        .eq('is_active', true)
+        .order('name');
+
+      console.log('📊 Users query result:', { usersData, usersError });
+      if (usersError) {
+        console.error('❌ Error loading users:', usersError);
+      } else {
+        setUsers(usersData || []);
+        console.log('✅ Users loaded:', usersData?.length || 0, 'users');
+      }
+    } catch (err) {
+      console.error('❌ Error loading roles and users:', err);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
   const emailFields = tableMetadata.filter(field => 
     field.key.includes('email') || 
     field.key.includes('receiver') ||
-    field.type === 'text' && field.display_name.toLowerCase().includes('email')
+    (field.type === 'text' && field.display_name.toLowerCase().includes('email')) ||
+    (field.type === 'jsonb' && field.key.includes('receivers'))
   );
 
   const handleConfigChange = (field: string, value: any) => {
@@ -37,155 +140,318 @@ export function EmailActionConfig({
 
   const handleTemplateCreated = (template: EmailTemplate) => {
     handleConfigChange('templateId', template.id);
-    setIsTemplateModalOpen(false);
+    setTemplateModalOpen(false);
+  };
+
+  const renderRecipientSelect = (field: 'to' | 'cc', label: string, required = false) => {
+    return (
+      <Form.Item
+        label={label}
+        required={required}
+        help={`Select recipient type and value for ${label.toLowerCase()}`}
+      >
+        <Row gutter={8}>
+          <Col span={8}>
+            <Select
+              value={configuration[`${field}Type`] || 'field'}
+              onChange={(value) => {
+                handleConfigChange(`${field}Type`, value);
+                handleConfigChange(field, ''); // Reset value when type changes
+              }}
+              placeholder="Recipient type"
+            >
+              <Select.Option value="field">Table Field</Select.Option>
+              <Select.Option value="custom_field">Custom Field</Select.Option>
+              <Select.Option value="team">Team</Select.Option>
+              <Select.Option value="role">Role</Select.Option>
+              <Select.Option value="user">User</Select.Option>
+              <Select.Option value="custom">Custom Email</Select.Option>
+            </Select>
+          </Col>
+          <Col span={16}>
+            {configuration[`${field}Type`] === 'field' && (
+              <Select
+                value={configuration[field] || ''}
+                onChange={(value) => handleConfigChange(field, value)}
+                placeholder="Select email field"
+                showSearch
+                filterOption={(input, option) =>
+                  (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                }
+              >
+                {emailFields.map((field) => (
+                  <Select.Option key={field.key} value={`{{new.${field.key}}}`}>
+                    {field.display_name} ({`{{new.${field.key}}}`})
+                  </Select.Option>
+                ))}
+              </Select>
+            )}
+
+            {configuration[`${field}Type`] === 'custom_field' && (
+              <Select
+                value={configuration[field] || ''}
+                onChange={(value) => handleConfigChange(field, value)}
+                placeholder="Select any field"
+                showSearch
+                filterOption={(input, option) =>
+                  (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                }
+              >
+                {tableMetadata.map((field) => (
+                  <Select.Option key={field.key} value={`{{new.${field.key}}}`}>
+                    {field.display_name} ({`{{new.${field.key}}}`})
+                  </Select.Option>
+                ))}
+              </Select>
+            )}
+
+            {configuration[`${field}Type`] === 'team' && (
+              <Select
+                value={configuration[field] || ''}
+                onChange={(value) => {
+                  const selectedTeam = teams.find(t => t.id === value);
+                  handleConfigChange(field, value);
+                  handleConfigChange(`_${field}TeamName`, selectedTeam?.name || '');
+                }}
+                placeholder="Select team"
+                loading={loadingData}
+                showSearch
+                filterOption={(input, option) =>
+                  (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                }
+              >
+                {teams.map((team) => (
+                  <Select.Option key={team.id} value={team.id}>
+                    {team.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            )}
+
+            {configuration[`${field}Type`] === 'role' && (
+              <Select
+                value={configuration[field] || ''}
+                onChange={(value) => {
+                  const selectedRole = roles.find(r => r.id === value);
+                  handleConfigChange(field, value);
+                  handleConfigChange(`_${field}RoleName`, selectedRole?.name || '');
+                }}
+                placeholder="Select role"
+                loading={loadingData}
+                showSearch
+                filterOption={(input, option) =>
+                  (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                }
+              >
+                {roles.map((role) => (
+                  <Select.Option key={role.id} value={role.id}>
+                    {role.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            )}
+
+            {configuration[`${field}Type`] === 'user' && (
+              <Select
+                value={configuration[field] || ''}
+                onChange={(value) => {
+                  const selectedUser = users.find(u => u.id === value);
+                  handleConfigChange(field, value);
+                  handleConfigChange(`_${field}UserName`, selectedUser?.name || '');
+                }}
+                placeholder="Select user"
+                loading={loadingData}
+                showSearch
+                filterOption={(input, option) =>
+                  (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                }
+              >
+                {users.map((user) => (
+                  <Select.Option key={user.id} value={user.id}>
+                    {user.name || user.details?.email || user.id}
+                  </Select.Option>
+                ))}
+              </Select>
+            )}
+
+            {configuration[`${field}Type`] === 'custom' && (
+              <Select
+                mode="tags"
+                value={configuration[field] ? configuration[field].split(',').filter(Boolean) : []}
+                onChange={(value) => handleConfigChange(field, Array.isArray(value) ? value.join(',') : value)}
+                placeholder="Enter email address"
+                tokenSeparators={[',']}
+                style={{ width: '100%' }}
+              >
+                {/* Allow custom email input */}
+              </Select>
+            )}
+
+            {configuration[`${field}Type`] === 'custom_field' && (
+              <Select
+                value={configuration[field] || ''}
+                onChange={(value) => handleConfigChange(field, value)}
+                placeholder="Select any field"
+                showSearch
+                filterOption={(input, option) =>
+                  (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                }
+              >
+                {tableMetadata.map((field) => (
+                  <Select.Option key={field.key} value={`{{new.${field.key}}}`}>
+                    {field.display_name} ({`{{new.${field.key}}}`})
+                  </Select.Option>
+                ))}
+              </Select>
+            )}
+          </Col>
+        </Row>
+
+        {/* Preview of selected recipient */}
+        {configuration[field] && (
+          <div style={{ marginTop: 8 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {configuration[`${field}Type`] === 'field' && `Will use: ${configuration[field]}`}
+              {configuration[`${field}Type`] === 'custom_field' && `Will use: ${configuration[field]}`}
+              {configuration[`${field}Type`] === 'team' && `Team: ${configuration[`_${field}TeamName`] || 'Unknown'}`}
+              {configuration[`${field}Type`] === 'role' && `Role: ${configuration[`_${field}RoleName`] || 'Unknown'}`}
+              {configuration[`${field}Type`] === 'user' && `User: ${configuration[`_${field}UserName`] || 'Unknown'}`}
+              {configuration[`${field}Type`] === 'custom' && `Email: ${configuration[field]}`}
+            </Text>
+          </div>
+        )}
+      </Form.Item>
+    );
   };
 
   return (
-    <div className="space-y-6">
-      {/* To Field */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Send To *
-        </label>
-        <div className="space-y-2">
-          <select
-            value={configuration.to || ''}
-            onChange={(e) => handleConfigChange('to', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Select email field or enter custom</option>
-            {emailFields.map((field) => (
-              //<option key={field.key} value={`{{new.${field.key}}}`}>
-               // {field.display_name} ({{new.{field.key}}})
-             // </option>
-            <option key={field.key} value={`{{new.${field.key}}}`}>
-  {/* {field.display_name} (`{{new.${field.key}}}`) */}
-              {`${field.display_name} ({{new.${field.key}}})`}
-</option>
-            ))}
-            <option value="custom">Custom email address</option>
-          </select>
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <Form layout="vertical" size="large">
+        {/* To Recipients */}
+        {renderRecipientSelect('to', 'Send To', true)}
+
+        {/* CC Recipients */}
+        {renderRecipientSelect('cc', 'CC (Optional)')}
+
+        <Form.Item
+          label="Email Template"
+          required
+          help="Choose or create an email template"
+        >
+          <Row gutter={8}>
+            <Col flex="auto">
+              <Select
+                value={configuration.templateId || ''}
+                onChange={(value) => handleConfigChange('templateId', value)}
+                placeholder="Select email template"
+              >
+                {emailTemplates.map((template) => (
+                  <Select.Option key={template.id} value={template.id}>
+                    {template.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Col>
+            <Col flex="none">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => setTemplateModalOpen(true)}
+              >
+                New Template
+              </Button>
+            </Col>
+          </Row>
           
-          {configuration.to === 'custom' && (
-            <input
-              type="email"
-              value={configuration.customTo || ''}
-              onChange={(e) => handleConfigChange('customTo', e.target.value)}
-              placeholder="Enter email address"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          {configuration.templateId && (
+            <Alert
+              message={emailTemplates.find(t => t.id === configuration.templateId)?.name}
+              description={emailTemplates.find(t => t.id === configuration.templateId)?.description}
+              type="info"
+              showIcon
+              icon={<FileTextOutlined />}
+              style={{ marginTop: 12 }}
             />
           )}
-        </div>
-        <p className="text-xs text-gray-500 mt-1">
-          {/* Use template variables like {{new.receivers.emails}} to reference record data */} 
-  {`Use template variables like {{new.receivers.emails}} to reference record data`}
-        </p>
-      </div>
+        </Form.Item>
 
-      {/* CC Team */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          CC Team (Optional)
-        </label>
-        <select
-          value={configuration.ccTeamId || ''}
-          onChange={(e) => {
-            const selectedTeam = teams.find(t => t.id === e.target.value);
-            handleConfigChange('ccTeamId', e.target.value);
-            handleConfigChange('_ccTeamName', selectedTeam?.name || '');
-          }}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="">No CC team</option>
-          {teams.map((team) => (
-            <option key={team.id} value={team.id}>
-              {team.name}
-            </option>
-          ))}
-        </select>
-      </div>
+        <Card title="Additional Settings" size="small">
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <Row align="middle">
+              <Col span={4}>
+                <Switch
+                  checked={configuration.sendImmediately !== false}
+                  onChange={(checked) => handleConfigChange('sendImmediately', checked)}
+                />
+              </Col>
+              <Col span={20}>
+                <Text>Send email immediately (don't queue)</Text>
+              </Col>
+            </Row>
+            
+            <Row align="middle">
+              <Col span={4}>
+                <Switch
+                  checked={configuration.trackOpens || false}
+                  onChange={(checked) => handleConfigChange('trackOpens', checked)}
+                />
+              </Col>
+              <Col span={20}>
+                <Text>Track email opens</Text>
+              </Col>
+            </Row>
+          </Space>
+        </Card>
+      </Form>
 
-      {/* Email Template */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Email Template *
-        </label>
-        <div className="flex gap-2">
-          <select
-            value={configuration.templateId || ''}
-            onChange={(e) => handleConfigChange('templateId', e.target.value)}
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Select email template</option>
-            {emailTemplates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => setIsTemplateModalOpen(true)}
-            className="bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            New
-          </button>
-        </div>
-        
-        {configuration.templateId && (
-          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start gap-2">
-              <FileText className="w-4 h-4 text-blue-600 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-blue-900">
-                  {emailTemplates.find(t => t.id === configuration.templateId)?.name}
-                </p>
-                <p className="text-blue-700 mt-1">
-                  {emailTemplates.find(t => t.id === configuration.templateId)?.description}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Additional Settings */}
-      <div className="bg-gray-50 rounded-lg p-4">
-        <h5 className="font-medium text-gray-900 mb-3">Additional Settings</h5>
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="send_immediately"
-              checked={configuration.sendImmediately !== false}
-              onChange={(e) => handleConfigChange('sendImmediately', e.target.checked)}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="send_immediately" className="text-sm text-gray-700">
-              Send email immediately (don't queue)
-            </label>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="track_opens"
-              checked={configuration.trackOpens || false}
-              onChange={(e) => handleConfigChange('trackOpens', e.target.checked)}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="track_opens" className="text-sm text-gray-700">
-              Track email opens
-            </label>
-          </div>
-        </div>
-      </div>
+      {/* Configuration Preview */}
+      {(configuration.to || configuration.cc) && (
+        <Alert
+          message="Email Configuration Preview"
+          description={
+            <Space direction="vertical" size="small">
+              {configuration.to && (
+                <Text>
+                  <strong>To:</strong> {
+                    configuration.toType === 'field' ? configuration.to :
+                    configuration.toType === 'team' ? `Team: ${configuration._toTeamName}` :
+                    configuration.toType === 'role' ? `Role: ${configuration._toRoleName}` :
+                    configuration.toType === 'user' ? `User: ${configuration._toUserName}` :
+                    configuration.toType === 'custom' ? configuration.to :
+                    'Not configured'
+                  }
+                </Text>
+              )}
+              {configuration.cc && (
+                <Text>
+                  <strong>CC:</strong> {
+                    configuration.ccType === 'field' ? configuration.cc :
+                    configuration.ccType === 'team' ? `Team: ${configuration._ccTeamName}` :
+                    configuration.ccType === 'role' ? `Role: ${configuration._ccRoleName}` :
+                    configuration.ccType === 'user' ? `User: ${configuration._ccUserName}` :
+                    configuration.ccType === 'custom' ? configuration.cc :
+                    'Not configured'
+                  }
+                </Text>
+              )}
+              {configuration.templateId && (
+                <Text>
+                  <strong>Template:</strong> {emailTemplates.find(t => t.id === configuration.templateId)?.name}
+                </Text>
+              )}
+            </Space>
+          }
+          type="success"
+          showIcon
+          icon={<MailOutlined />}
+        />
+      )}
 
       <EmailTemplateModal
-        isOpen={isTemplateModalOpen}
-        onClose={() => setIsTemplateModalOpen(false)}
+        isOpen={templateModalOpen}
+        onClose={() => setTemplateModalOpen(false)}
         onSave={handleTemplateCreated}
       />
-    </div>
+    </Space>
   );
 }

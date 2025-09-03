@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Save, ArrowLeft, ArrowRight, Settings, Zap, Mail, UserCheck, Tag, Edit, Activity, Workflow } from 'lucide-react';
+import { Steps, Button, Space, Alert, Spin, Row, Col, Card, Typography } from 'antd';
+import { 
+  SaveOutlined, 
+  ArrowLeftOutlined, 
+  ArrowRightOutlined, 
+  SettingOutlined, 
+  ThunderboltOutlined, 
+  BranchesOutlined
+} from '@ant-design/icons';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
 import { WorkflowBasicInfo } from './WorkflowBasicInfo';
@@ -7,22 +15,23 @@ import { WorkflowConditions } from './WorkflowConditions';
 import { WorkflowActions } from './WorkflowActions';
 import type { WorkflowRule, WorkflowAction, ViewConfig, EmailTemplate, Team } from '../../lib/types';
 
+const { Title, Paragraph, Text } = Typography;
+
 interface WorkflowWizardProps {
-  isOpen: boolean;
   onClose: () => void;
   workflowId?: string;
   onSave?: (workflow: WorkflowRule) => void;
+  processDefinitionId?: string;
 }
 
-export function WorkflowWizard({ isOpen, onClose, workflowId, onSave }: WorkflowWizardProps) {
+export function WorkflowWizard({ onClose, workflowId, onSave, processDefinitionId }: WorkflowWizardProps) {
   const { user } = useAuthStore();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Workflow data
-  const [workflow, setWorkflow] = useState<Partial<WorkflowRule>>({
+  const [workflow, setWorkflow] = useState<Partial<WorkflowRule>>(() => ({
     organization_id: user?.organization_id || '',
     name: '',
     description: '',
@@ -33,7 +42,8 @@ export function WorkflowWizard({ isOpen, onClose, workflowId, onSave }: Workflow
     actions: [],
     is_active: true,
     priority: 0,
-  });
+    workflow_definition_id: processDefinitionId,
+  }));
 
   const [actions, setActions] = useState<WorkflowAction[]>([]);
   const [availableTables, setAvailableTables] = useState<ViewConfig[]>([]);
@@ -44,28 +54,26 @@ export function WorkflowWizard({ isOpen, onClose, workflowId, onSave }: Workflow
     {
       title: 'Basic Information',
       description: 'Define workflow name, trigger, and table',
-      icon: Settings,
+      icon: <SettingOutlined />,
     },
     {
       title: 'Conditions',
       description: 'Set up when this workflow should run',
-      icon: Zap,
+      icon: <ThunderboltOutlined />,
     },
     {
       title: 'Actions',
       description: 'Configure what actions to perform',
-      icon: Activity,
+      icon: <BranchesOutlined />,
     },
   ];
 
   useEffect(() => {
-    if (isOpen) {
-      loadInitialData();
-      if (workflowId) {
-        loadWorkflow(workflowId);
-      }
+    loadInitialData();
+    if (workflowId) {
+      loadWorkflow(workflowId);
     }
-  }, [isOpen, workflowId]);
+  }, [workflowId]);
 
   const loadInitialData = async () => {
     setLoading(true);
@@ -133,7 +141,6 @@ export function WorkflowWizard({ isOpen, onClose, workflowId, onSave }: Workflow
     try {
       setLoading(true);
       
-      // Load workflow
       const { data: workflowData, error: workflowError } = await supabase
         .schema('workflow')
         .from('wf_workflows')
@@ -144,17 +151,22 @@ export function WorkflowWizard({ isOpen, onClose, workflowId, onSave }: Workflow
       if (workflowError) throw workflowError;
       setWorkflow(workflowData);
 
-      // Load associated actions
       if (workflowData.actions && workflowData.actions.length > 0) {
-        const { data: actionsData, error: actionsError } = await supabase
-          .schema('workflow')
-          .from('wf_actions')
-          .select('*')
-          .in('id', workflowData.actions)
-          .order('action_order');
+        const validActionIds = workflowData.actions.filter(id => 
+          id && typeof id === 'string' && !id.startsWith('temp-')
+        );
+        
+        if (validActionIds.length > 0) {
+          const { data: actionsData, error: actionsError } = await supabase
+            .schema('workflow')
+            .from('wf_actions')
+            .select('*')
+            .in('id', validActionIds)
+            .order('action_order');
 
-        if (actionsError) throw actionsError;
-        setActions(actionsData || []);
+          if (actionsError) throw actionsError;
+          setActions(actionsData || []);
+        }
       }
     } catch (err) {
       setError('Failed to load workflow');
@@ -169,10 +181,9 @@ export function WorkflowWizard({ isOpen, onClose, workflowId, onSave }: Workflow
     setError('');
 
     try {
-      // Save workflow
       const workflowData = {
         ...workflow,
-        actions: actions.map(action => action.id).filter(Boolean),
+        actions: actions.map(action => action.id || `temp-${Date.now()}-${Math.random()}`),
         updated_at: new Date().toISOString(),
       };
 
@@ -204,28 +215,35 @@ export function WorkflowWizard({ isOpen, onClose, workflowId, onSave }: Workflow
         savedWorkflow = data;
       }
 
-      // Save actions
       for (const action of actions) {
-        const actionData = {
-          ...action,
-          organization_id: user?.organization_id,
-          updated_at: new Date().toISOString(),
-        };
-
-        if (action.id) {
-          await supabase
+        if (!action.id || action.id.startsWith('temp-')) {
+          const actionData = {
+            ...action,
+            id: undefined,
+            organization_id: user?.organization_id,
+            x_workflow_id: savedWorkflow.id,
+            created_at: new Date().toISOString(),
+          };
+          
+          const { error: actionError } = await supabase
             .schema('workflow')
             .from('wf_actions')
+            .insert(actionData);
+
+          if (actionError) throw actionError;
+        } else {
+          const actionData = {
+            ...action,
+            organization_id: user?.organization_id,
+            updated_at: new Date().toISOString(),
+          };
+
+          const { error: actionError } = await supabase
+            .from('old-wf_actions')
             .update(actionData)
             .eq('id', action.id);
-        } else {
-          await supabase
-            .schema('workflow')
-            .from('wf_actions')
-            .insert({
-              ...actionData,
-              created_at: new Date().toISOString(),
-            });
+
+          if (actionError) throw actionError;
         }
       }
 
@@ -242,11 +260,11 @@ export function WorkflowWizard({ isOpen, onClose, workflowId, onSave }: Workflow
   const canProceedToNext = () => {
     switch (currentStep) {
       case 0:
-        return workflow.name && workflow.trigger_table && workflow.trigger_type;
+        return Boolean(workflow.name && workflow.trigger_table && workflow.trigger_type);
       case 1:
-        return true; // Conditions are optional
+        return true;
       case 2:
-        return actions.length > 0;
+        return actions.length > 0 && actions.every(action => action.name && action.action_type);
       default:
         return false;
     }
@@ -264,162 +282,134 @@ export function WorkflowWizard({ isOpen, onClose, workflowId, onSave }: Workflow
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Workflow className="w-8 h-8" />
-              <div>
-                <h2 className="text-2xl font-bold">
-                  {workflowId ? 'Edit Workflow' : 'Create New Workflow'}
-                </h2>
-                <p className="text-blue-100 mt-1">
-                  {steps[currentStep].description}
-                </p>
-              </div>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ 
+        background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)', 
+        color: 'white', 
+        padding: 24 
+      }}>
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Space>
+            <BranchesOutlined style={{ fontSize: 24 }} />
+            <div>
+              <Title level={3} style={{ color: 'white', margin: 0 }}>
+                {workflowId ? 'Edit Workflow' : 'Create New Workflow'}
+              </Title>
+              <Paragraph style={{ color: 'rgba(255,255,255,0.8)', margin: 0 }}>
+                {steps[currentStep].description}
+              </Paragraph>
             </div>
-            <button
-              onClick={onClose}
-              className="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
+          </Space>
+          
+          <Steps
+            current={currentStep}
+            size="small"
+            items={steps.map((step, index) => ({
+              title: step.title,
+              icon: step.icon,
+              status: index === currentStep ? 'process' : index < currentStep ? 'finish' : 'wait'
+            }))}
+            style={{ background: 'rgba(255,255,255,0.1)', padding: 16, borderRadius: 8 }}
+          />
+        </Space>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, padding: 24, overflow: 'auto' }}>
+        {error && (
+          <Alert
+            message={error}
+            type="error"
+            style={{ marginBottom: 24 }}
+            closable
+            onClose={() => setError('')}
+          />
+        )}
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 48 }}>
+            <Spin size="large" />
+            <Paragraph style={{ marginTop: 16 }}>Loading...</Paragraph>
           </div>
-
-          {/* Progress Steps */}
-          <div className="mt-6">
-            <div className="flex items-center justify-between">
-              {steps.map((step, index) => {
-                const Icon = step.icon;
-                const isActive = index === currentStep;
-                const isCompleted = index < currentStep;
-                
-                return (
-                  <div key={index} className="flex items-center">
-                    <div className={`
-                      flex items-center gap-3 px-4 py-2 rounded-lg transition-all
-                      ${isActive ? 'bg-white bg-opacity-20' : ''}
-                      ${isCompleted ? 'text-green-200' : ''}
-                    `}>
-                      <div className={`
-                        w-8 h-8 rounded-full flex items-center justify-center
-                        ${isActive ? 'bg-white text-blue-600' : 
-                          isCompleted ? 'bg-green-500 text-white' : 'bg-white bg-opacity-20'}
-                      `}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div className="hidden sm:block">
-                        <p className="font-medium">{step.title}</p>
-                      </div>
-                    </div>
-                    {index < steps.length - 1 && (
-                      <div className="w-8 h-px bg-white bg-opacity-30 mx-2" />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <p className="text-red-800">{error}</p>
-            </div>
-          )}
-
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-3 text-gray-600">Loading...</span>
-            </div>
-          ) : (
-            <>
-              {currentStep === 0 && (
-                <WorkflowBasicInfo
-                  workflow={workflow}
-                  onUpdate={setWorkflow}
-                  availableTables={availableTables}
-                />
-              )}
-
-              {currentStep === 1 && (
-                <WorkflowConditions
-                  workflow={workflow}
-                  onUpdate={setWorkflow}
-                  availableTables={availableTables}
-                />
-              )}
-
-              {currentStep === 2 && (
-                <WorkflowActions
-                  actions={actions}
-                  onUpdate={setActions}
-                  workflow={workflow}
-                  availableTables={availableTables}
-                  emailTemplates={emailTemplates}
-                  teams={teams}
-                />
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">
-              Step {currentStep + 1} of {steps.length}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handlePrevious}
-              disabled={currentStep === 0}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Previous
-            </button>
-
-            {currentStep < steps.length - 1 ? (
-              <button
-                onClick={handleNext}
-                disabled={!canProceedToNext()}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                Next
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            ) : (
-              <button
-                onClick={handleSave}
-                disabled={!canProceedToNext() || saving}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {saving ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Save Workflow
-                  </>
-                )}
-              </button>
+        ) : (
+          <Card style={{ height: '100%' }}>
+            {currentStep === 0 && (
+              <WorkflowBasicInfo
+                workflow={workflow}
+                onUpdate={setWorkflow}
+                availableTables={availableTables}
+              />
             )}
-          </div>
-        </div>
+
+            {currentStep === 1 && (
+              <WorkflowConditions
+                workflow={workflow}
+                onUpdate={(conditions) => setWorkflow(prev => ({ ...prev, conditions }))}
+                availableTables={availableTables.map(t => t.entity_type)}
+              />
+            )}
+
+            {currentStep === 2 && (
+              <WorkflowActions
+                actions={actions}
+                onUpdate={setActions}
+                workflow={workflow}
+                availableTables={availableTables}
+                emailTemplates={emailTemplates}
+                teams={teams}
+              />
+            )}
+          </Card>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{ 
+        background: '#fafafa', 
+        borderTop: '1px solid #f0f0f0', 
+        padding: '16px 24px' 
+      }}>
+        <Row justify="space-between" align="middle">
+          <Col>
+            <Text type="secondary">
+              Step {currentStep + 1} of {steps.length}
+            </Text>
+          </Col>
+          <Col>
+            <Space>
+              <Button
+                onClick={handlePrevious}
+                disabled={currentStep === 0}
+                icon={<ArrowLeftOutlined />}
+              >
+                Previous
+              </Button>
+
+              {currentStep < steps.length - 1 ? (
+                <Button
+                  type="primary"
+                  onClick={handleNext}
+                  disabled={!canProceedToNext()}
+                  icon={<ArrowRightOutlined />}
+                >
+                  Next
+                </Button>
+              ) : (
+                <Button
+                  type="primary"
+                  onClick={handleSave}
+                  disabled={!canProceedToNext() || saving}
+                  loading={saving}
+                  icon={<SaveOutlined />}
+                >
+                  Save Workflow
+                </Button>
+              )}
+            </Space>
+          </Col>
+        </Row>
       </div>
     </div>
   );

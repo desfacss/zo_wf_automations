@@ -1,8 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Eye, Clock, CheckCircle, XCircle, AlertCircle, Filter, RefreshCw } from 'lucide-react';
+import { 
+  Button, 
+  Table, 
+  Card, 
+  Space, 
+  Typography, 
+  Tag, 
+  Alert, 
+  Row, 
+  Col, 
+  Select, 
+  DatePicker, 
+  Spin,
+  Drawer,
+  Tooltip
+} from 'antd';
+import { 
+  ArrowLeftOutlined, 
+  EyeOutlined, 
+  ClockCircleOutlined, 
+  CheckCircleOutlined, 
+  CloseCircleOutlined, 
+  ExclamationCircleOutlined, 
+  FilterOutlined, 
+  ReloadOutlined 
+} from '@ant-design/icons';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
 import { EventDetailsModal } from './EventDetailsModal';
+import dayjs from 'dayjs';
+
+const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
 
 interface WorkflowLog {
   id: string;
@@ -23,49 +52,102 @@ interface WorkflowLog {
 }
 
 interface WorkflowLogsViewProps {
-  workflowId: string;
-  workflowName: string;
-  onBack: () => void;
+  workflowId?: string;
+  workflowName?: string;
+  onBack?: () => void;
+  showAllLogs?: boolean;
 }
 
-export function WorkflowLogsView({ workflowId, workflowName, onBack }: WorkflowLogsViewProps) {
+export function WorkflowLogsView({ workflowId, workflowName, onBack, showAllLogs = false }: WorkflowLogsViewProps) {
   const { user } = useAuthStore();
   const [logs, setLogs] = useState<WorkflowLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedLog, setSelectedLog] = useState<WorkflowLog | null>(null);
+  const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
+  
+  // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
+    dayjs().startOf('day'),
+    dayjs().endOf('day')
+  ]);
+  const [includeUnknownActions, setIncludeUnknownActions] = useState(false);
 
   useEffect(() => {
     loadLogs();
-  }, [workflowId, statusFilter, sortOrder]);
+  }, [workflowId, statusFilter, dateRange, showAllLogs]);
+
+  // Apply filtering logic to logs
+  const filteredLogs = logs.filter(log => {
+    // If includeUnknownActions is true, show all logs
+    if (includeUnknownActions) {
+      return true;
+    }
+    
+    // Filter out logs with unknown actions
+    const hasActionName = log.context?.action_name && log.context.action_name !== 'Unknown Action';
+    const hasActionType = log.context?.action_type && log.context.action_type !== 'N/A';
+    const hasWorkflowStage = log.workflow_stage && log.workflow_stage !== 'Unknown Action';
+    
+    return hasActionName || hasActionType || hasWorkflowStage;
+  });
 
   const loadLogs = async () => {
     if (!user?.organization_id) return;
+
+    console.log('🔄 Loading workflow logs with params:', {
+      workflowId,
+      showAllLogs,
+      statusFilter,
+      dateRange: dateRange.map(d => d.format('YYYY-MM-DD HH:mm:ss')),
+      organization_id: user.organization_id
+    });
 
     try {
       setLoading(true);
       setError('');
 
       let query = supabase
-        .schema('workflow')
-        .from('wf_logs')
+        .from('old-wf_logs')
         .select('*')
-        .eq('workflow_id', workflowId)
         .eq('organization_id', user.organization_id);
 
+      // Filter by specific workflow if provided
+      if (!showAllLogs && workflowId) {
+        console.log('📊 Adding workflow_id filter:', workflowId);
+        query = query.eq('workflow_id', workflowId);
+      }
+
+      // Filter by status
       if (statusFilter !== 'all') {
+        console.log('📊 Adding status filter:', statusFilter);
         query = query.eq('status', statusFilter);
       }
 
-      query = query.order('execution_time', { ascending: sortOrder === 'asc' });
+      // Filter by date range
+      const startDate = dateRange[0].toISOString();
+      const endDate = dateRange[1].toISOString();
+      console.log('📊 Adding date range filter:', { startDate, endDate });
+      query = query
+        .gte('execution_time', startDate)
+        .lte('execution_time', endDate);
 
+      query = query.order('execution_time', { ascending: false });
+
+      console.log('📊 Executing workflow logs query',startDate,endDate);
       const { data, error } = await query;
+
+      console.log('📊 Workflow logs query result:', { 
+        data: data ? `${data.length} logs` : 'null', 
+        error 
+      });
 
       if (error) throw error;
       setLogs(data || []);
+      console.log('✅ Workflow logs loaded successfully:', data?.length || 0, 'logs');
     } catch (err: any) {
+      console.error('❌ Error loading workflow logs:', err);
       setError(err.message || 'Failed to load workflow logs');
     } finally {
       setLoading(false);
@@ -75,30 +157,30 @@ export function WorkflowLogsView({ workflowId, workflowName, onBack }: WorkflowL
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'success':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
+        return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
       case 'failed':
-        return <XCircle className="w-4 h-4 text-red-600" />;
+        return <CloseCircleOutlined style={{ color: '#ff4d4f' }} />;
       case 'pending':
-        return <Clock className="w-4 h-4 text-yellow-600" />;
+        return <ClockCircleOutlined style={{ color: '#faad14' }} />;
       case 'running':
-        return <AlertCircle className="w-4 h-4 text-blue-600" />;
+        return <ExclamationCircleOutlined style={{ color: '#1890ff' }} />;
       default:
-        return <AlertCircle className="w-4 h-4 text-gray-600" />;
+        return <ExclamationCircleOutlined style={{ color: '#8c8c8c' }} />;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'success':
-        return 'bg-green-100 text-green-800';
+        return 'success';
       case 'failed':
-        return 'bg-red-100 text-red-800';
+        return 'error';
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'warning';
       case 'running':
-        return 'bg-blue-100 text-blue-800';
+        return 'processing';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'default';
     }
   };
 
@@ -108,185 +190,307 @@ export function WorkflowLogsView({ workflowId, workflowName, onBack }: WorkflowL
     return `${(ms / 1000).toFixed(2)}s`;
   };
 
-  const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString();
+  const openDetailsModal = (log: WorkflowLog) => {
+    setSelectedLog(log);
+    setDetailsDrawerOpen(true);
   };
 
-  if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-          <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="bg-gray-200 h-16 rounded-lg"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const columns = [
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      width: 120,
+      render: (status: string) => (
+        <Space>
+          {getStatusIcon(status)}
+          <Tag color={getStatusColor(status)}>
+            {status.toUpperCase()}
+          </Tag>
+        </Space>
+      ),
+    },
+    {
+      title: 'Execution Time',
+      dataIndex: 'execution_time',
+      key: 'execution_time',
+      width: 180,
+      render: (time: string) => (
+        <Text>{dayjs(time).format('MMM DD, HH:mm:ss')}</Text>
+      ),
+    },
+    {
+      title: 'Action',
+      key: 'action',
+      width: 200,
+      render: (record: WorkflowLog) => (
+        <Space direction="vertical" size="small">
+          <Text strong>{record.context?.action_name || record.workflow_stage || 'Unknown Action'}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {record.context?.action_type || record.log_level || 'N/A'}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'Duration',
+      dataIndex: 'duration_ms',
+      key: 'duration_ms',
+      width: 100,
+      render: (duration: number | null) => (
+        <Text>{formatDuration(duration)}</Text>
+      ),
+    },
+    {
+      title: 'Retry',
+      dataIndex: 'retry_attempt',
+      key: 'retry_attempt',
+      width: 80,
+      render: (retry: number) => (
+        <Text>{retry > 0 ? retry : '-'}</Text>
+      ),
+    },
+    {
+      title: 'Error',
+      dataIndex: 'error_message',
+      key: 'error_message',
+      width: 200,
+      render: (error: string | null) => (
+        error ? (
+          <Tooltip title={error}>
+            <Text type="danger" ellipsis style={{ maxWidth: 180 }}>
+              {error}
+            </Text>
+          </Tooltip>
+        ) : (
+          <Text type="secondary">-</Text>
+        )
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 100,
+      render: (record: WorkflowLog) => (
+        <Button
+          type="link"
+          icon={<EyeOutlined />}
+          onClick={() => openDetailsModal(record)}
+        >
+          Details
+        </Button>
+      ),
+    },
+  ];
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-800 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Workflow Logs</h1>
-            <p className="text-gray-600 mt-1">{workflowName}</p>
-          </div>
-        </div>
-        <button
-          onClick={loadLogs}
-          disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+    <div style={{ padding: 24 }}>
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        {/* Header */}
+        <Row justify="space-between" align="middle">
+          <Col>
+            <Space>
+              {onBack && (
+                <Button
+                  type="text"
+                  icon={<ArrowLeftOutlined />}
+                  onClick={onBack}
+                />
+              )}
+              <div>
+                <Title level={2} style={{ margin: 0 }}>
+                  {showAllLogs ? 'All Workflow Logs' : `Workflow Logs: ${workflowName}`}
+                </Title>
+                <Text type="secondary">
+                  {showAllLogs 
+                    ? 'View execution logs for all workflows in your organization'
+                    : `Execution history for ${workflowName}`
+                  }
+                </Text>
+              </div>
+            </Space>
+          </Col>
+          <Col>
+            <Button
+              type="primary"
+              icon={<ReloadOutlined />}
+              onClick={loadLogs}
+              loading={loading}
+            >
+              Refresh
+            </Button>
+          </Col>
+        </Row>
+
+        {/* Filters */}
+        <Card title={
+          <Space>
+            <FilterOutlined />
+            <span>Filters</span>
+          </Space>
+        } size="small">
+          <Row gutter={16} align="middle">
+            <Col xs={24} sm={8}>
+              <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                <Text strong>Date Range</Text>
+                <RangePicker
+                  value={dateRange}
+                  onChange={(dates) => {
+                    if (dates) {
+                      setDateRange([
+                        dates[0]!.startOf('day'),
+                        dates[1]!.endOf('day')
+                      ]);
+                    }
+                  }}
+                  style={{ width: '100%' }}
+                  showTime
+                />
+              </Space>
+            </Col>
+            
+            <Col xs={24} sm={6}>
+              <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                <Text strong>Status</Text>
+                <Select
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  style={{ width: '100%' }}
+                >
+                  <Select.Option value="all">All Statuses</Select.Option>
+                  <Select.Option value="success">Success</Select.Option>
+                  <Select.Option value="failed">Failed</Select.Option>
+                  <Select.Option value="pending">Pending</Select.Option>
+                  <Select.Option value="running">Running</Select.Option>
+                </Select>
+              </Space>
+            </Col>
+
+            <Col xs={24} sm={10}>
+              <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                <Text strong>Quick Filters</Text>
+                <Space wrap>
+                  <Button
+                    size="small"
+                    onClick={() => setDateRange([dayjs().startOf('day'), dayjs().endOf('day')])}
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    size="small"
+                    onClick={() => setDateRange([dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')])}
+                  >
+                    Yesterday
+                  </Button>
+                  <Button
+                    size="small"
+                    onClick={() => setDateRange([dayjs().subtract(7, 'days').startOf('day'), dayjs().endOf('day')])}
+                  >
+                    Last 7 Days
+                  </Button>
+                  <Button
+                    size="small"
+                    onClick={() => setStatusFilter('failed')}
+                    danger={statusFilter === 'failed'}
+                  >
+                    Failed Only
+                  </Button>
+                </Space>
+              </Space>
+            </Col>
+
+            <Col xs={24} sm={10}>
+              <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                <Text strong>Display Options</Text>
+                <Space wrap>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={includeUnknownActions}
+                      onChange={(e) => setIncludeUnknownActions(e.target.checked)}
+                    />
+                    <Text>Include unknown actions</Text>
+                  </label>
+                </Space>
+              </Space>
+            </Col>
+          </Row>
+        </Card>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert
+            message="Error Loading Logs"
+            description={error}
+            type="error"
+            closable
+            onClose={() => setError('')}
+          />
+        )}
+
+        {/* Logs Table */}
+        <Card
+          title={
+            <Space>
+              <ClockCircleOutlined />
+              <span>Execution Logs</span>
+              <Text type="secondary">({logs.length} entries)</Text>
+            </Space>
+          }
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
-      </div>
+          <Table
+            columns={columns}
+            dataSource={filteredLogs}
+            rowKey="id"
+            loading={loading}
+            pagination={{
+              pageSize: 50,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total, range) => 
+                `${range[0]}-${range[1]} of ${total} logs${logs.length !== filteredLogs.length ? ` (${logs.length} total)` : ''}`,
+            }}
+            scroll={{ x: 1000 }}
+            locale={{
+              emptyText: (
+                <div style={{ textAlign: 'center', padding: 48 }}>
+                  <ClockCircleOutlined style={{ fontSize: 64, color: '#d9d9d9', marginBottom: 16 }} />
+                  <Title level={4}>No Logs Found</Title>
+                  <Text type="secondary">
+                    {statusFilter === 'all' 
+                      ? 'No workflow executions found for the selected date range'
+                      : `No logs found with status: ${statusFilter}`
+                    }
+                  </Text>
+                </div>
+              )
+            }}
+          />
+        </Card>
+      </Space>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Filters:</span>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Status:</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All</option>
-              <option value="success">Success</option>
-              <option value="failed">Failed</option>
-              <option value="pending">Pending</option>
-              <option value="running">Running</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Sort:</label>
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-              className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="desc">Newest First</option>
-              <option value="asc">Oldest First</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">{error}</p>
-        </div>
-      )}
-
-      {/* Logs Table */}
-      {logs.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
-          <Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Logs Found</h3>
-          <p className="text-gray-600">
-            {statusFilter === 'all' 
-              ? 'This workflow has not been executed yet'
-              : `No logs found with status: ${statusFilter}`
-            }
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Execution Time
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Action
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Duration
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Retry
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(log.status)}
-                        <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(log.status)}`}>
-                          {log.status}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatTimestamp(log.execution_time)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {log.context?.action_name || 'Unknown Action'}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {log.context?.action_type || 'N/A'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDuration(log.duration_ms)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {log.retry_attempt > 0 ? `${log.retry_attempt}` : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => setSelectedLog(log)}
-                        className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                      >
-                        <Eye className="w-4 h-4" />
-                        View Details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Event Details Modal */}
-      <EventDetailsModal
-        log={selectedLog}
-        isOpen={!!selectedLog}
-        onClose={() => setSelectedLog(null)}
-      />
+      {/* Event Details Drawer */}
+      <Drawer
+        title={selectedLog ? `Log Details: ${selectedLog.id.substring(0, 8)}...` : 'Log Details'}
+        width="80%"
+        open={detailsDrawerOpen}
+        onClose={() => {
+          setDetailsDrawerOpen(false);
+          setSelectedLog(null);
+        }}
+        destroyOnClose
+      >
+        {selectedLog && (
+          <EventDetailsModal
+            log={selectedLog}
+            isOpen={detailsDrawerOpen}
+            onClose={() => {
+              setDetailsDrawerOpen(false);
+              setSelectedLog(null);
+            }}
+          />
+        )}
+      </Drawer>
     </div>
   );
 }

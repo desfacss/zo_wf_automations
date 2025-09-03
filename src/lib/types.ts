@@ -151,3 +151,183 @@ export interface Condition {
   value: any;
   logicalOperator?: 'AND' | 'OR';
 }
+
+export interface WorkflowDefinition {
+  id: string;
+  organization_id: string;
+  name: string;
+  entity_type: string;
+  entity_schema?: string;
+  description?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  automation_hooks?: any[];
+  version?: number;
+  notes?: any;
+  notes2?: any;
+  definitions?: {
+    name: string;
+    description?: string;
+    processType?: string;
+    startStateId: string;
+    stages: WorkflowStage[];
+    transitions: WorkflowTransition[];
+  };
+  created_by?: string;
+  updated_by?: string;
+  notes3?: any;
+  type?: string;
+  initial_template?: any;
+}
+
+export interface WorkflowStage {
+  id: string;
+  name: string;
+  sequence: number;
+  displayLabel: string;
+  on_entry_event_name?: string;
+  on_exit_event_name?: string;
+  systemStatusCategory: string;
+  raci?: {
+    responsible?: Array<{ type: string; name?: string; idExpression?: string }>;
+    accountable?: Array<{ type: string; name?: string; idExpression?: string }>;
+    consulted?: Array<{ type: string; name?: string; idExpression?: string }>;
+    informed?: Array<{ type: string; name?: string; idExpression?: string }>;
+  };
+}
+
+export interface WorkflowTransition {
+  id: string;
+  from: string | string[];
+  to: string;
+  name: string;
+  trigger?: 'manual' | 'automatic' | 'event' | 'time_elapsed_in_state';
+  condition?: {
+    rule: string;
+  };
+  timeThresholdHours?: number;
+}
+
+export interface StageMetrics {
+  id: string;
+  organization_id: string;
+  process_definition_id: string;
+  entity_type: string;
+  metrics_data: StageMetric[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StageMetric {
+  stage_id: string;
+  pertTime: {
+    optimisticHours: number;
+    mostLikelyHours: number;
+    pessimisticHours: number;
+  };
+  pertCost: {
+    optimisticUsd: number;
+    mostLikelyUsd: number;
+    pessimisticUsd: number;
+  };
+  aspirationalMetrics: {
+    targetTimeHours: number;
+    targetCostUsd: number;
+  };
+  requiredSkills: string[];
+  resourceRequirements: Array<{
+    type: 'worker' | 'system';
+    skills: string[];
+  }>;
+}
+
+export interface WorkflowDefinition {
+  id: string;
+  organization_id: string;
+  name: string;
+  entity_type: string;
+  entity_schema?: string;
+  description?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  automation_hooks?: any[];
+  version?: number;
+  notes?: any;
+  notes2?: any;
+  definitions?: {
+    name: string;
+    description?: string;
+    processType?: string;
+    startStateId: string;
+    stages: WorkflowStage[];
+    transitions: WorkflowTransition[];
+  };
+  created_by?: string;
+  updated_by?: string;
+  notes3?: any;
+  type?: string;
+  initial_template?: any;
+}
+
+export interface WorkflowStage {
+  id: string;
+  name: string;
+  sequence: number;
+  displayLabel: string;
+  on_entry_event_name?: string;
+  on_exit_event_name?: string;
+  systemStatusCategory: string;
+  raci?: {
+    responsible?: Array<{ type: string; name?: string; idExpression?: string }>;
+    accountable?: Array<{ type: string; name?: string; idExpression?: string }>;
+    consulted?: Array<{ type: string; name?: string; idExpression?: string }>;
+    informed?: Array<{ type: string; name?: string; idExpression?: string }>;
+  };
+}
+
+export interface WorkflowTransition {
+  id: string;
+  from: string | string[];
+  to: string;
+  name: string;
+  trigger?: 'manual' | 'automatic' | 'event' | 'time_elapsed_in_state';
+  condition?: {
+    rule: string;
+  };
+  timeThresholdHours?: number;
+}
+
+export interface StageMetrics {
+  id: string;
+  organization_id: string;
+  process_definition_id: string;
+  entity_type: string;
+  metrics_data: StageMetric[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StageMetric {
+  stage_id: string;
+  pertTime: {
+    optimisticHours: number;
+    mostLikelyHours: number;
+    pessimisticHours: number;
+  };
+  pertCost: {
+    optimisticUsd: number;
+    mostLikelyUsd: number;
+    pessimisticUsd: number;
+  };
+  aspirationalMetrics: {
+    targetTimeHours: number;
+    targetCostUsd: number;
+  };
+  requiredSkills: string[];
+  resourceRequirements: Array<{
+    type: 'worker' | 'system';
+    skills: string[];
+  }>;
+}

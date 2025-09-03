@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Users, User } from 'lucide-react';
-import type { WorkflowRule, ViewConfig, Team, TableMetadata } from '../../../lib/types';
+import { Form, Select, Radio, Card, Row, Col, Typography, Space, Alert } from 'antd';
+import { TeamOutlined, UserOutlined } from '@ant-design/icons';
+import type { WorkflowRule, ViewConfig, TableMetadata, Team } from '../../../lib/types';
+
+const { Title, Paragraph, Text } = Typography;
 
 interface AssignOwnerActionConfigProps {
   configuration: any;
@@ -26,7 +29,6 @@ export function AssignOwnerActionConfig({
     }
   }, [workflow.trigger_table, availableTables]);
 
-  // Get fields that can be used for assignment (user/owner fields)
   const assignableFields = tableMetadata.filter(field => 
     field.key.includes('assignee') || 
     field.key.includes('owner') ||
@@ -46,150 +48,149 @@ export function AssignOwnerActionConfig({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Target Field */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Assignment Field *
-        </label>
-        <select
-          value={configuration.field || ''}
-          onChange={(e) => handleConfigChange('field', e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <Form layout="vertical" size="large">
+        <Form.Item
+          label="Assignment Field"
+          required
+          help="Choose which field will receive the assigned user ID"
         >
-          <option value="">Select field to assign</option>
-          {assignableFields.map((field) => (
-            <option key={field.key} value={field.key}>
-              {field.display_name}
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-gray-500 mt-1">
-          Choose which field will receive the assigned user ID
-        </p>
-      </div>
-
-      {/* Assignment Rule */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
-          Assignment Rule *
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {assignmentRules.map((rule) => {
-            const isSelected = configuration.assignmentRule === rule.value;
-            
-            return (
-              <button
-                key={rule.value}
-                onClick={() => handleConfigChange('assignmentRule', rule.value)}
-                className={`
-                  p-4 border-2 rounded-lg text-left transition-all
-                  ${isSelected 
-                    ? 'border-blue-500 bg-blue-50 text-blue-900' 
-                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                  }
-                `}
-              >
-                <div className="flex items-start gap-3">
-                  <Users className={`w-5 h-5 mt-0.5 ${isSelected ? 'text-blue-600' : 'text-gray-400'}`} />
-                  <div>
-                    <p className="font-medium">{rule.label}</p>
-                    <p className="text-sm opacity-75 mt-1">{rule.description}</p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Team Selection */}
-      {configuration.assignmentRule !== 'specific_user' && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Team *
-          </label>
-          <select
-            value={configuration.userGroupId || ''}
-            onChange={(e) => handleConfigChange('userGroupId', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          <Select
+            value={configuration.field || ''}
+            onChange={(value) => handleConfigChange('field', value)}
+            placeholder="Select field to assign"
           >
-            <option value="">Select team</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
+            {assignableFields.map((field) => (
+              <Select.Option key={field.key} value={field.key}>
+                {field.display_name}
+              </Select.Option>
             ))}
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
-            Users will be assigned from this team based on the selected rule
-          </p>
-        </div>
-      )}
+          </Select>
+        </Form.Item>
 
-      {/* Condition */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Assignment Condition (Optional)
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs text-gray-600 mb-1">Field</label>
-            <select
-              value={configuration.condition?.field || ''}
-              onChange={(e) => handleConfigChange('condition', { 
-                ...configuration.condition, 
-                field: e.target.value 
-              })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">No condition</option>
-              {assignableFields.map((field) => (
-                <option key={field.key} value={field.key}>
-                  {field.display_name}
-                </option>
+        <Form.Item
+          label="Assignment Rule"
+          required
+          help="Choose how users will be assigned"
+        >
+          <Radio.Group
+            value={configuration.assignmentRule}
+            onChange={(e) => handleConfigChange('assignmentRule', e.target.value)}
+            style={{ width: '100%' }}
+          >
+            <Row gutter={[16, 16]}>
+              {assignmentRules.map((rule) => (
+                <Col xs={24} sm={12} key={rule.value}>
+                  <Card size="small" hoverable>
+                    <Radio value={rule.value} style={{ width: '100%' }}>
+                      <Space>
+                        <TeamOutlined style={{ color: '#1890ff' }} />
+                        <div>
+                          <Text strong>{rule.label}</Text>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {rule.description}
+                          </Text>
+                        </div>
+                      </Space>
+                    </Radio>
+                  </Card>
+                </Col>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-600 mb-1">Must Be</label>
-            <select
-              value={configuration.condition?.must_be || ''}
-              onChange={(e) => handleConfigChange('condition', { 
-                ...configuration.condition, 
-                must_be: e.target.value 
-              })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            </Row>
+          </Radio.Group>
+        </Form.Item>
+
+        {configuration.assignmentRule !== 'specific_user' && (
+          <Form.Item
+            label="Team"
+            required
+            help="Users will be assigned from this team based on the selected rule"
+          >
+            <Select
+              value={configuration.userGroupId || ''}
+              onChange={(value) => handleConfigChange('userGroupId', value)}
+              placeholder="Select team"
             >
-              <option value="">Any value</option>
-              <option value="NULL">Empty/Null</option>
-              <option value="NOT_NULL">Not empty</option>
-            </select>
-          </div>
-        </div>
-        <p className="text-xs text-gray-500 mt-1">
-          Only assign if the specified field meets this condition
-        </p>
-      </div>
+              {teams.map((team) => (
+                <Select.Option key={team.id} value={team.id}>
+                  {team.name}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+        )}
+
+        <Card title="Assignment Condition (Optional)" size="small">
+          <Paragraph type="secondary">
+            Only assign if the specified condition is met
+          </Paragraph>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label="Field"
+                help="Field to check before assignment"
+              >
+                <Select
+                  value={configuration.condition?.field || ''}
+                  onChange={(value) => handleConfigChange('condition', { 
+                    ...configuration.condition, 
+                    field: value 
+                  })}
+                  placeholder="No condition"
+                  allowClear
+                >
+                  {assignableFields.map((field) => (
+                    <Select.Option key={field.key} value={field.key}>
+                      {field.display_name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label="Must Be"
+                help="Condition that must be met"
+              >
+                <Select
+                  value={configuration.condition?.must_be || ''}
+                  onChange={(value) => handleConfigChange('condition', { 
+                    ...configuration.condition, 
+                    must_be: value 
+                  })}
+                  placeholder="Any value"
+                  allowClear
+                >
+                  <Select.Option value="NULL">Empty/Null</Select.Option>
+                  <Select.Option value="NOT_NULL">Not empty</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
+      </Form>
 
       {/* Preview */}
       {configuration.field && configuration.assignmentRule && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-start gap-2">
-            <User className="w-4 h-4 text-green-600 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-medium text-green-900">Assignment Preview</p>
-              <p className="text-green-700 mt-1">
-                Will assign <strong>{tableMetadata.find(f => f.key === configuration.field)?.display_name}</strong> using{' '}
-                <strong>{assignmentRules.find(r => r.value === configuration.assignmentRule)?.label}</strong>
+        <Alert
+          message="Assignment Preview"
+          description={
+            <Space direction="vertical">
+              <Text>
+                Will assign <Text strong>{tableMetadata.find(f => f.key === configuration.field)?.display_name}</Text> using{' '}
+                <Text strong>{assignmentRules.find(r => r.value === configuration.assignmentRule)?.label}</Text>
                 {configuration.userGroupId && (
-                  <span> from team <strong>{teams.find(t => t.id === configuration.userGroupId)?.name}</strong></span>
+                  <span> from team <Text strong>{teams.find(t => t.id === configuration.userGroupId)?.name}</Text></span>
                 )}
-              </p>
-            </div>
-          </div>
-        </div>
+              </Text>
+            </Space>
+          }
+          type="success"
+          showIcon
+          icon={<UserOutlined />}
+        />
       )}
-    </div>
+    </Space>
   );
 }

@@ -1,6 +1,10 @@
 import React from 'react';
-import { Database, Clock, RefreshCw, Zap } from 'lucide-react';
+import { Form, Input, Select, Radio, Switch, Space, Typography, Card, Row, Col } from 'antd';
+import { DatabaseOutlined, ClockCircleOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { WorkflowRule, ViewConfig } from '../../lib/types';
+
+const { Title, Paragraph, Text } = Typography;
+const { TextArea } = Input;
 
 interface WorkflowBasicInfoProps {
   workflow: Partial<WorkflowRule>;
@@ -9,173 +13,190 @@ interface WorkflowBasicInfoProps {
 }
 
 export function WorkflowBasicInfo({ workflow, onUpdate, availableTables }: WorkflowBasicInfoProps) {
+  const [form] = Form.useForm();
+
   const triggerTypes = [
-    { value: 'on_create', label: 'On Create', description: 'Trigger when new records are created', icon: Zap },
-    { value: 'on_update', label: 'On Update', description: 'Trigger when records are updated', icon: RefreshCw },
-    { value: 'both', label: 'Create & Update', description: 'Trigger on both create and update', icon: Database },
-    { value: 'cron', label: 'Scheduled', description: 'Run on a schedule using cron', icon: Clock },
+    { value: 'on_create', label: 'On Create', description: 'Trigger when new records are created', icon: ThunderboltOutlined },
+    { value: 'on_update', label: 'On Update', description: 'Trigger when records are updated', icon: ReloadOutlined },
+    { value: 'both', label: 'Create & Update', description: 'Trigger on both create and update', icon: DatabaseOutlined },
+    { value: 'cron', label: 'Scheduled', description: 'Run on a schedule using cron', icon: ClockCircleOutlined },
   ];
+
+  React.useEffect(() => {
+    form.setFieldsValue({
+      name: workflow.name || '',
+      description: workflow.description || '',
+      trigger_type: workflow.trigger_type || 'on_create',
+      trigger_table: workflow.trigger_table || '',
+      cron_config: workflow.cron_config || '',
+      cron_description: workflow.cron_description || '',
+      priority: workflow.priority || 0,
+      is_active: workflow.is_active !== false,
+    });
+  }, [workflow, form]);
 
   const handleInputChange = (field: keyof WorkflowRule, value: any) => {
     onUpdate({ ...workflow, [field]: value });
   };
 
   return (
-    <div className="space-y-8">
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-6">Basic Workflow Information</h3>
+        <Title level={3}>Basic Workflow Information</Title>
+        <Paragraph type="secondary">
+          Configure the fundamental properties of your workflow
+        </Paragraph>
+      </div>
         
-        <div className="grid grid-cols-1 gap-6">
-          {/* Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Workflow Name *
-            </label>
-            <input
-              type="text"
-              value={workflow.name || ''}
-              onChange={(e) => handleInputChange('name', e.target.value)}
-              placeholder="Enter a descriptive name for your workflow"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+      <Form 
+        form={form}
+        layout="vertical" 
+        size="large"
+        onValuesChange={(changedValues) => {
+          Object.keys(changedValues).forEach(key => {
+            handleInputChange(key as keyof WorkflowRule, changedValues[key]);
+          });
+        }}
+      >
+        <Card title="Basic Information" size="small">
+          <Form.Item
+            name="name"
+            label="Workflow Name"
+            rules={[{ required: true, message: 'Please enter workflow name' }]}
+            help="Enter a descriptive name for your workflow"
+          >
+            <Input placeholder="Enter a descriptive name for your workflow" />
+          </Form.Item>
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description
-            </label>
-            <textarea
-              value={workflow.description || ''}
-              onChange={(e) => handleInputChange('description', e.target.value)}
+          <Form.Item
+            name="description"
+            label="Description"
+            help="Describe what this workflow does and when it should run"
+          >
+            <TextArea
               placeholder="Describe what this workflow does and when it should run"
               rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
-          </div>
+          </Form.Item>
+        </Card>
 
-          {/* Trigger Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Trigger Type *
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {triggerTypes.map((type) => {
-                const Icon = type.icon;
-                const isSelected = workflow.trigger_type === type.value;
-                
-                return (
-                  <button
-                    key={type.value}
-                    onClick={() => handleInputChange('trigger_type', type.value)}
-                    className={`
-                      p-4 border-2 rounded-lg text-left transition-all
-                      ${isSelected 
-                        ? 'border-blue-500 bg-blue-50 text-blue-900' 
-                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                      }
-                    `}
-                  >
-                    <div className="flex items-start gap-3">
-                      <Icon className={`w-5 h-5 mt-0.5 ${isSelected ? 'text-blue-600' : 'text-gray-400'}`} />
-                      <div>
-                        <p className="font-medium">{type.label}</p>
-                        <p className="text-sm opacity-75 mt-1">{type.description}</p>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+        <Card title="Trigger Configuration" size="small">
+          <Form.Item
+            name="trigger_type"
+            label="Trigger Type"
+            rules={[{ required: true, message: 'Please select trigger type' }]}
+            help="Choose when this workflow should execute"
+          >
+            <Radio.Group style={{ width: '100%' }}>
+              <Row gutter={[16, 16]}>
+                {triggerTypes.map((type) => {
+                  const Icon = type.icon;
+                  return (
+                    <Col xs={24} sm={12} key={type.value}>
+                      <Card size="small" hoverable>
+                        <Radio value={type.value} style={{ width: '100%' }}>
+                          <Space>
+                            <Icon style={{ color: '#1890ff' }} />
+                            <div>
+                              <Text strong>{type.label}</Text>
+                              <br />
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                {type.description}
+                              </Text>
+                            </div>
+                          </Space>
+                        </Radio>
+                      </Card>
+                    </Col>
+                  );
+                })}
+              </Row>
+            </Radio.Group>
+          </Form.Item>
 
-          {/* Cron Configuration */}
-          {workflow.trigger_type === 'cron' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cron Expression *
-                </label>
-                <input
-                  type="text"
-                  value={workflow.cron_config || ''}
-                  onChange={(e) => handleInputChange('cron_config', e.target.value)}
-                  placeholder="0 9 * * 1-5"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Example: "0 9 * * 1-5" runs at 9 AM on weekdays
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Schedule Description
-                </label>
-                <input
-                  type="text"
-                  value={workflow.cron_description || ''}
-                  onChange={(e) => handleInputChange('cron_description', e.target.value)}
-                  placeholder="Every weekday at 9 AM"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-          )}
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) => prevValues.trigger_type !== currentValues.trigger_type}
+          >
+            {({ getFieldValue }) =>
+              getFieldValue('trigger_type') === 'cron' ? (
+                <Row gutter={16}>
+                  <Col xs={24} sm={12}>
+                    <Form.Item
+                      name="cron_config"
+                      label="Cron Expression"
+                      rules={[{ required: true, message: 'Please enter cron expression' }]}
+                      help='Example: "0 9 * * 1-5" runs at 9 AM on weekdays'
+                    >
+                      <Input placeholder="0 9 * * 1-5" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item
+                      name="cron_description"
+                      label="Schedule Description"
+                      help="Human-readable description of the schedule"
+                    >
+                      <Input placeholder="Every weekday at 9 AM" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              ) : null
+            }
+          </Form.Item>
 
-          {/* Trigger Table */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Target Table *
-            </label>
-            <select
-              value={workflow.trigger_table || ''}
-              onChange={(e) => handleInputChange('trigger_table', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          <Form.Item
+            name="trigger_table"
+            label="Target Table"
+            rules={[{ required: true, message: 'Please select target table' }]}
+            help="Choose the table that this workflow will monitor for changes"
+          >
+            <Select
+              placeholder="Select a table to monitor"
+              showSearch
+              filterOption={(input, option) =>
+                (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
+              }
             >
-              <option value="">Select a table to monitor</option>
               {availableTables.map((table) => (
-                <option key={table.id} value={table.entity_type}>
+                <Select.Option key={table.id} value={table.entity_type}>
                   {table.entity_schema ? `${table.entity_schema}.${table.entity_type}` : table.entity_type}
-                </option>
+                </Select.Option>
               ))}
-            </select>
-            <p className="text-xs text-gray-500 mt-1">
-              Choose the table that this workflow will monitor for changes
-            </p>
-          </div>
+            </Select>
+          </Form.Item>
+        </Card>
 
-          {/* Priority */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Priority
-            </label>
-            <select
-              value={workflow.priority || 0}
-              onChange={(e) => handleInputChange('priority', parseInt(e.target.value))}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value={0}>Normal (0)</option>
-              <option value={1}>High (1)</option>
-              <option value={2}>Critical (2)</option>
-              <option value={-1}>Low (-1)</option>
-            </select>
-          </div>
+        <Card title="Settings" size="small">
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="priority"
+                label="Priority"
+                help="Higher priority workflows execute first"
+              >
+                <Select>
+                  <Select.Option value={-1}>Low (-1)</Select.Option>
+                  <Select.Option value={0}>Normal (0)</Select.Option>
+                  <Select.Option value={1}>High (1)</Select.Option>
+                  <Select.Option value={2}>Critical (2)</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
 
-          {/* Active Status */}
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="is_active"
-              checked={workflow.is_active || false}
-              onChange={(e) => handleInputChange('is_active', e.target.checked)}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
-              Enable this workflow immediately after creation
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="is_active"
+                label="Enable Workflow"
+                help="Enable this workflow immediately after creation"
+                valuePropName="checked"
+              >
+                <Switch />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
+      </Form>
+    </Space>
   );
 }

@@ -1,24 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Settings, Zap, Play, Pause, Edit, Trash2, Eye, Activity, Clock } from 'lucide-react';
+import { Button, Card, Space, Typography, Tag, Spin, Alert, Empty, Row, Col, Tooltip, Dropdown, Badge } from 'antd';
+import { 
+  PlusOutlined, 
+  ThunderboltOutlined, 
+  PlayCircleOutlined, 
+  PauseCircleOutlined, 
+  EditOutlined, 
+  DeleteOutlined, 
+  EyeOutlined, 
+  ClockCircleOutlined,
+  MoreOutlined
+} from '@ant-design/icons';
 import { WorkflowWizard } from './WorkflowWizard';
-import { WorkflowLogsView } from './WorkflowLogsView';
+import { Drawer } from 'antd';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
 import type { WorkflowRule } from '../../lib/types';
 
-export function AutomationDashboard() {
+const { Title, Paragraph } = Typography;
+
+interface AutomationDashboardProps {
+  onViewLogs?: (workflowId: string, workflowName: string) => void;
+}
+
+export function AutomationDashboard({ onViewLogs }: AutomationDashboardProps = {}) {
   const { user } = useAuthStore();
   const [workflows, setWorkflows] = useState<WorkflowRule[]>([]);
+  const [workflowLogCounts, setWorkflowLogCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
   const [editingWorkflowId, setEditingWorkflowId] = useState<string | undefined>();
-  const [viewingLogsWorkflow, setViewingLogsWorkflow] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     loadWorkflows();
   }, [user]);
 
+  useEffect(() => {
+    if (workflows.length > 0) {
+      loadWorkflowLogCounts();
+    }
+  }, [workflows]);
   const loadWorkflows = async () => {
     if (!user?.organization_id) return;
 
@@ -42,6 +64,32 @@ export function AutomationDashboard() {
     }
   };
 
+  const loadWorkflowLogCounts = async () => {
+    if (!user?.organization_id || workflows.length === 0) return;
+
+    try {
+      const workflowIds = workflows.map(w => w.id).filter(Boolean);
+      if (workflowIds.length === 0) return;
+
+      const { data, error } = await supabase
+        .schema('workflow')
+        .from('wf_logs')
+        .select('workflow_id')
+        .in('workflow_id', workflowIds)
+        .gte('execution_time', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      data?.forEach(log => {
+        counts[log.workflow_id] = (counts[log.workflow_id] || 0) + 1;
+      });
+
+      setWorkflowLogCounts(counts);
+    } catch (err) {
+      console.error('Error loading workflow log counts:', err);
+    }
+  };
   const toggleWorkflowStatus = async (workflowId: string, isActive: boolean) => {
     try {
       const { error } = await supabase
@@ -58,14 +106,9 @@ export function AutomationDashboard() {
   };
 
   const deleteWorkflow = async (workflowId: string) => {
-    if (!confirm('Are you sure you want to delete this workflow? This action cannot be undone.')) {
-      return;
-    }
-
     try {
       const { error } = await supabase
-        .schema('workflow')
-        .from('wf_workflows')
+        .from('old-wf_workflows')
         .delete()
         .eq('id', workflowId);
 
@@ -78,39 +121,24 @@ export function AutomationDashboard() {
 
   const openEditWizard = (workflowId: string) => {
     setEditingWorkflowId(workflowId);
-    setIsWizardOpen(true);
+    setEditDrawerOpen(true);
   };
 
   const openCreateWizard = () => {
     setEditingWorkflowId(undefined);
-    setIsWizardOpen(true);
+    setEditDrawerOpen(true);
   };
 
   const openLogsView = (workflowId: string, workflowName: string) => {
-    setViewingLogsWorkflow({ id: workflowId, name: workflowName });
-  };
-
-  const closeLogsView = () => {
-    setViewingLogsWorkflow(null);
-  };
-
-  const handleWizardClose = () => {
-    setIsWizardOpen(false);
-    setEditingWorkflowId(undefined);
+    if (onViewLogs) {
+      onViewLogs(workflowId, workflowName);
+    }
   };
 
   const handleWorkflowSaved = () => {
     loadWorkflows();
-  };
-
-  const getTriggerTypeLabel = (type: string) => {
-    const types = {
-      'on_create': 'On Create',
-      'on_update': 'On Update', 
-      'both': 'Create & Update',
-      'cron': 'Scheduled',
-    };
-    return types[type as keyof typeof types] || type;
+    setEditDrawerOpen(false);
+    setEditingWorkflowId(undefined);
   };
 
   const getTriggerTypeColor = (type: string) => {
@@ -120,167 +148,217 @@ export function AutomationDashboard() {
       'both': 'purple',
       'cron': 'orange',
     };
-    return colors[type as keyof typeof colors] || 'gray';
+    return colors[type as keyof typeof colors] || 'default';
   };
 
-  // Show logs view if selected
-  if (viewingLogsWorkflow) {
-    return (
-      <WorkflowLogsView
-        workflowId={viewingLogsWorkflow.id}
-        workflowName={viewingLogsWorkflow.name}
-        onBack={closeLogsView}
-      />
-    );
-  }
+  const getWorkflowActions = (workflow: WorkflowRule) => {
+    const logCount = workflowLogCounts[workflow.id!] || 0;
+    
+    const actions = [
+      {
+        key: 'logs',
+        icon: logCount > 0 ? (
+          <Badge count={logCount} size="small">
+            <ClockCircleOutlined />
+          </Badge>
+        ) : (
+          <ClockCircleOutlined />
+        ),
+        tooltip: 'View logs',
+        onClick: () => openLogsView(workflow.id!, workflow.name),
+      },
+      {
+        key: 'toggle',
+        icon: workflow.is_active ? <PauseCircleOutlined /> : <PlayCircleOutlined />,
+        tooltip: workflow.is_active ? 'Pause workflow' : 'Activate workflow',
+        onClick: () => toggleWorkflowStatus(workflow.id!, workflow.is_active!),
+      },
+      {
+        key: 'edit',
+        icon: <EditOutlined />,
+        tooltip: 'Edit workflow',
+        onClick: () => openEditWizard(workflow.id!),
+      },
+      {
+        key: 'delete',
+        icon: <DeleteOutlined />,
+        tooltip: 'Delete workflow',
+        onClick: () => deleteWorkflow(workflow.id!),
+        danger: true,
+      },
+    ];
 
+    if (actions.length <= 3) {
+      return (
+        <Space size="small">
+          {actions.map(action => (
+            <Tooltip key={action.key} title={action.tooltip}>
+              <Button
+                type="text"
+                icon={action.icon}
+                onClick={action.onClick}
+                danger={action.danger}
+                size="small"
+              />
+            </Tooltip>
+          ))}
+        </Space>
+      );
+    }
+
+    const visibleActions = actions.slice(0, 2);
+    const menuActions = actions.slice(2);
+
+    return (
+      <Space size="small">
+        {visibleActions.map(action => (
+          <Tooltip key={action.key} title={action.tooltip}>
+            <Button
+              type="text"
+              icon={action.icon}
+              onClick={action.onClick}
+              danger={action.danger}
+              size="small"
+            />
+          </Tooltip>
+        ))}
+        <Dropdown
+          menu={{
+            items: menuActions.map(action => ({
+              key: action.key,
+              icon: action.icon,
+              label: action.tooltip,
+              onClick: action.onClick,
+              danger: action.danger,
+            })),
+          }}
+          trigger={['click']}
+        >
+          <Button type="text" icon={<MoreOutlined />} size="small" />
+        </Dropdown>
+      </Space>
+    );
+  };
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-          <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-          <div className="grid gap-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="bg-gray-200 h-32 rounded-lg"></div>
-            ))}
-          </div>
-        </div>
+      <div style={{ padding: 24, textAlign: 'center' }}>
+        <Spin size="large" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Workflow Automation</h1>
-          <p className="text-gray-600 mt-2">
+    <div style={{ padding: 24 }}>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
+        <Col>
+          <Title level={2} style={{ margin: 0 }}>Workflow Automation</Title>
+          <Paragraph type="secondary">
             Create and manage automated workflows for your organization
-          </p>
-        </div>
-        <button
-          onClick={openCreateWizard}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg"
-        >
-          <Plus className="w-5 h-5" />
-          Create Workflow
-        </button>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">{error}</p>
-        </div>
-      )}
-
-      {/* Workflows List */}
-      {workflows.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
-          <Activity className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Workflows Yet</h3>
-          <p className="text-gray-600 mb-6">
-            Create your first automated workflow to streamline your processes
-          </p>
-          <button
+          </Paragraph>
+        </Col>
+        <Col>
+          <Button
+            type="primary"
+            size="large"
+            icon={<PlusOutlined />}
             onClick={openCreateWizard}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
           >
-            <Plus className="w-5 h-5" />
-            Create First Workflow
-          </button>
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {workflows.map((workflow) => {
-            const triggerColor = getTriggerTypeColor(workflow.trigger_type);
-            
-            return (
-              <div
-                key={workflow.id}
-                className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <h3 className="text-xl font-semibold text-gray-900">{workflow.name}</h3>
-                      <span className={`px-3 py-1 text-sm rounded-full bg-${triggerColor}-100 text-${triggerColor}-700`}>
-                        {getTriggerTypeLabel(workflow.trigger_type)}
-                      </span>
-                      <span className={`px-3 py-1 text-sm rounded-full ${
-                        workflow.is_active 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {workflow.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-                    
-                    <p className="text-gray-600 mb-4">{workflow.description}</p>
-                    
-                    <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                      <span>Table: {workflow.trigger_table}</span>
-                      <span>Actions: {workflow.actions?.length || 0}</span>
-                      <span>Priority: {workflow.priority}</span>
-                      {workflow.last_executed_at && (
-                        <span>Last run: {new Date(workflow.last_executed_at).toLocaleDateString()}</span>
-                      )}
-                    </div>
-                  </div>
+            Create Workflow
+          </Button>
+        </Col>
+      </Row>
 
-                  <div className="flex items-center gap-2 ml-4">
-                    <button
-                      onClick={() => openLogsView(workflow.id!, workflow.name)}
-                      className="text-gray-600 hover:bg-gray-50 p-2 rounded-lg transition-colors"
-                      title="View logs"
-                    >
-                      <Clock className="w-4 h-4" />
-                    </button>
-                    
-                    <button
-                      onClick={() => toggleWorkflowStatus(workflow.id!, workflow.is_active!)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        workflow.is_active
-                          ? 'text-orange-600 hover:bg-orange-50'
-                          : 'text-green-600 hover:bg-green-50'
-                      }`}
-                      title={workflow.is_active ? 'Pause workflow' : 'Activate workflow'}
-                    >
-                      {workflow.is_active ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                    </button>
-                    
-                    <button
-                      onClick={() => openEditWizard(workflow.id!)}
-                      className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors"
-                      title="Edit workflow"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    
-                    <button
-                      onClick={() => deleteWorkflow(workflow.id!)}
-                      className="text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                      title="Delete workflow"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {error && (
+        <Alert
+          message={error}
+          type="error"
+          style={{ marginBottom: 24 }}
+          closable
+          onClose={() => setError('')}
+        />
       )}
 
-      {/* Wizard */}
-      <WorkflowWizard
-        isOpen={isWizardOpen}
-        onClose={handleWizardClose}
-        workflowId={editingWorkflowId}
-        onSave={handleWorkflowSaved}
-      />
+      {workflows.length === 0 ? (
+        <Empty
+          image={<ThunderboltOutlined style={{ fontSize: 64, color: '#d9d9d9' }} />}
+          description={
+            <div>
+              <Title level={4}>No Workflows Yet</Title>
+              <Paragraph type="secondary">
+                Create your first automated workflow to streamline your processes
+              </Paragraph>
+            </div>
+          }
+        >
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateWizard}>
+            Create First Workflow
+          </Button>
+        </Empty>
+      ) : (
+        <Row gutter={[16, 16]}>
+          {workflows.map((workflow) => (
+            <Col xs={24} key={workflow.id}>
+              <Card
+                className="workflow-card"
+              >
+                <Card.Meta
+                  title={
+                    <Row justify="space-between" align="middle">
+                      <Col>
+                        <Space>
+                          {workflow.name}
+                          <Tag color={getTriggerTypeColor(workflow.trigger_type)}>
+                            {workflow.trigger_type.replace('_', ' ').toUpperCase()}
+                          </Tag>
+                          <Tag color={workflow.is_active ? 'success' : 'default'}>
+                            {workflow.is_active ? 'Active' : 'Inactive'}
+                          </Tag>
+                        </Space>
+                      </Col>
+                      <Col>
+                        {getWorkflowActions(workflow)}
+                      </Col>
+                    </Row>
+                  }
+                  description={
+                    <div>
+                      <Paragraph ellipsis={{ rows: 2 }}>{workflow.description}</Paragraph>
+                      <Space size="small" wrap>
+                        <span>Table: {workflow.trigger_table}</span>
+                        <span>Actions: {workflow.actions?.length || 0}</span>
+                        <span>Priority: {workflow.priority}</span>
+                        {workflow.last_executed_at && (
+                          <span>Last run: {new Date(workflow.last_executed_at).toLocaleDateString()}</span>
+                        )}
+                      </Space>
+                    </div>
+                  }
+                />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      )}
+
+      <Drawer
+        title={editingWorkflowId ? 'Edit Workflow' : 'Create New Workflow'}
+        width="80%"
+        open={editDrawerOpen}
+        onClose={() => {
+          setEditDrawerOpen(false);
+          setEditingWorkflowId(undefined);
+        }}
+        destroyOnClose
+      >
+        <WorkflowWizard
+          onClose={() => {
+            setEditDrawerOpen(false);
+            setEditingWorkflowId(undefined);
+          }}
+          workflowId={editingWorkflowId}
+          onSave={handleWorkflowSaved}
+        />
+      </Drawer>
     </div>
   );
 }

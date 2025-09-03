@@ -1,26 +1,36 @@
 import React from 'react';
-import { AuthProvider, useAuth } from './hooks/useAuth';
+import { ConfigProvider, theme, App as AntApp } from 'antd';
+import { AutomationTabs } from './components/automation/AutomationTabs';
 import { LoginForm } from './components/LoginForm';
-import { Dashboard } from './components/Dashboard';
-import { LoadingSpinner } from './components/LoadingSpinner';
-import {AutomationDashboard} from './components/automation/index';
-import {EventDetailsModal} from './components/automation/EventDetailsModal';
 import { useAuthStore } from './lib/store';
 
 function AppContent() {
   const { user } = useAuthStore();
 
-console.log("uz",user);
   if (!user) {
     return <LoginForm />;
   }
 
-  return <AutomationDashboard/>;
+  return <AutomationTabs />;
 }
 
 function App() {
+  const [isDarkMode, setIsDarkMode] = React.useState(false);
+
   return (
-      <AppContent />
+    <ConfigProvider
+      theme={{
+        algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        token: {
+          colorPrimary: '#1890ff',
+          borderRadius: 8,
+        },
+      }}
+    >
+      <AntApp>
+        <AppContent />
+      </AntApp>
+    </ConfigProvider>
   );
 }
 

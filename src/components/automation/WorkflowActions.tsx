@@ -1,7 +1,319 @@
+// import React, { useState } from 'react';
+// import { Button, Card, Row, Col, Typography, Space, Tag, Empty, Drawer } from 'antd';
+// import { 
+//   PlusOutlined, 
+//   DeleteOutlined, 
+//   EditOutlined, 
+//   MailOutlined, 
+//   UserSwitchOutlined, 
+//   TagOutlined, 
+//   ThunderboltOutlined, 
+//   DatabaseOutlined, 
+//   BranchesOutlined, 
+//   ArrowUpOutlined,
+//   ArrowDownOutlined
+// } from '@ant-design/icons';
+// import { ActionConfigModal } from './ActionConfigModal';
+// import ActionConfigModal from './ActionConfigModal';
+// import type { WorkflowAction, WorkflowRule, ViewConfig, EmailTemplate, Team } from '../../lib/types';
+
+// const { Title, Paragraph, Text } = Typography;
+
+// interface WorkflowActionsProps {
+//   actions: WorkflowAction[];
+//   onUpdate: (actions: WorkflowAction[]) => void;
+//   workflow: Partial<WorkflowRule>;
+//   availableTables: ViewConfig[];
+//   emailTemplates: EmailTemplate[];
+//   teams: Team[];
+// }
+
+// export function WorkflowActions({ 
+//   actions, 
+//   onUpdate, 
+//   workflow, 
+//   availableTables, 
+//   emailTemplates, 
+//   teams 
+// }: WorkflowActionsProps) {
+//   const [editingAction, setEditingAction] = useState<WorkflowAction | null>(null);
+//   const [drawerOpen, setDrawerOpen] = useState(false);
+
+//   const actionTypes = [
+//     { value: 'send_email', label: 'Send Email', description: 'Send an email notification', icon: MailOutlined, color: 'blue' },
+//     { value: 'assign_owner', label: 'Assign Owner', description: 'Assign record to a user or team', icon: UserSwitchOutlined, color: 'green' },
+//     { value: 'update_fields', label: 'Update Fields', description: 'Update specific fields in the record', icon: EditOutlined, color: 'purple' },
+//     { value: 'add_tags', label: 'Add Tags', description: 'Add tags to the record', icon: TagOutlined, color: 'orange' },
+//     { value: 'create_activity', label: 'Create Activity', description: 'Create a follow-up activity', icon: ThunderboltOutlined, color: 'cyan' },
+//     { value: 'create_record', label: 'Create Record', description: 'Create a new record in another table', icon: DatabaseOutlined, color: 'geekblue' },
+//     { value: 'trigger_workflow_event', label: 'Trigger Workflow', description: 'Trigger another workflow', icon: BranchesOutlined, color: 'magenta' },
+//   ];
+
+//   const getActionTypeInfo = (type: string) => {
+//     return actionTypes.find(at => at.value === type) || actionTypes[0];
+//   };
+
+//   const handleAddAction = () => {
+//     setEditingAction(null);
+//     setDrawerOpen(true);
+//   };
+
+//   const handleEditAction = (action: WorkflowAction) => {
+//     setEditingAction(action);
+//     setDrawerOpen(true);
+//   };
+
+//   const handleSaveAction = (actionData: Partial<WorkflowAction>) => {
+//     const editingActionExists = actionData.id && actionData.id.startsWith('temp-') ? null : 
+//       actions.find(a => a.id === actionData.id);
+    
+//     if (editingActionExists) {
+//       const updatedActions = actions.map(action => 
+//         action.id === editingActionExists.id ? { ...action, ...actionData } : action
+//       );
+//       onUpdate(updatedActions);
+//     } else {
+//       const newAction: WorkflowAction = {
+//         action_type: actionData.action_type!,
+//         configuration: actionData.configuration || {},
+//         action_order: actions.length + 1,
+//         retry_count: 0,
+//         max_retries: 3,
+//         is_enabled: true,
+//         organization_id: workflow.organization_id!,
+//         name: actionData.name || `${actionData.action_type} Action`,
+//         ...actionData,
+//       };
+//       onUpdate([...actions, newAction]);
+//     }
+//     setDrawerOpen(false);
+//     setEditingAction(null);
+//   };
+
+//   const removeAction = (actionId: string) => {
+//     const updatedActions = actions
+//       .filter(action => action.id !== actionId)
+//       .map((action, index) => ({ ...action, action_order: index + 1 }));
+//     onUpdate(updatedActions);
+//   };
+
+//   const moveAction = (actionId: string, direction: 'up' | 'down') => {
+//     const currentIndex = actions.findIndex(action => action.id === actionId);
+//     if (currentIndex === -1) return;
+
+//     const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+//     if (newIndex < 0 || newIndex >= actions.length) return;
+
+//     const newActions = [...actions];
+//     [newActions[currentIndex], newActions[newIndex]] = [newActions[newIndex], newActions[currentIndex]];
+    
+//     const reorderedActions = newActions.map((action, index) => ({
+//       ...action,
+//       action_order: index + 1,
+//     }));
+    
+//     onUpdate(reorderedActions);
+//   };
+
+//   return (
+//     <Space direction="vertical" size="large" style={{ width: '100%' }}>
+//       <Row justify="space-between" align="middle">
+//         <Col>
+//           <Title level={4} style={{ margin: 0 }}>Workflow Actions</Title>
+//           <Text type="secondary">
+//             Define what happens when this workflow triggers. Actions run in order.
+//           </Text>
+//         </Col>
+//         <Col>
+//           <Button
+//             type="primary"
+//             icon={<PlusOutlined />}
+//             onClick={handleAddAction}
+//           >
+//             Add Action
+//           </Button>
+//         </Col>
+//       </Row>
+
+//       {actions.length === 0 ? (
+//         <Empty
+//           image={<ThunderboltOutlined style={{ fontSize: 64, color: '#d9d9d9' }} />}
+//           description={
+//             <div>
+//               <Title level={4}>No Actions Configured</Title>
+//               <Paragraph type="secondary">
+//                 Add actions to define what happens when this workflow triggers
+//               </Paragraph>
+//             </div>
+//           }
+//         >
+//           <Button
+//             type="primary"
+//             icon={<PlusOutlined />}
+//             onClick={handleAddAction}
+//           >
+//             Add First Action
+//           </Button>
+//         </Empty>
+//       ) : (
+//         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+//           {actions.map((action, index) => {
+//             const actionInfo = getActionTypeInfo(action.action_type);
+//             const Icon = actionInfo.icon;
+            
+//             return (
+//               <Card key={action.id} size="small" hoverable>
+//                 <Row align="middle" gutter={16}>
+//                   <Col flex="none">
+//                     <Space direction="vertical" size="small">
+//                       <Button
+//                         type="text"
+//                         icon={<ArrowUpOutlined />}
+//                         onClick={() => moveAction(action.id!, 'up')}
+//                         disabled={index === 0}
+//                         size="small"
+//                       />
+//                       <Button
+//                         type="text"
+//                         icon={<ArrowDownOutlined />}
+//                         onClick={() => moveAction(action.id!, 'down')}
+//                         disabled={index === actions.length - 1}
+//                         size="small"
+//                       />
+//                     </Space>
+//                   </Col>
+
+//                   <Col flex="none">
+//                     <div style={{
+//                       background: '#f0f0f0',
+//                       color: '#666',
+//                       width: 32,
+//                       height: 32,
+//                       borderRadius: '50%',
+//                       display: 'flex',
+//                       alignItems: 'center',
+//                       justifyContent: 'center',
+//                       fontSize: 14,
+//                       fontWeight: 500
+//                     }}>
+//                       {action.action_order}
+//                     </div>
+//                   </Col>
+
+//                   <Col flex="none">
+//                     <div style={{
+//                       width: 40,
+//                       height: 40,
+//                       borderRadius: 8,
+//                       display: 'flex',
+//                       alignItems: 'center',
+//                       justifyContent: 'center',
+//                       background: `var(--ant-color-${actionInfo.color}-1)`
+//                     }}>
+//                       <Icon style={{ fontSize: 20, color: `var(--ant-color-${actionInfo.color}-6)` }} />
+//                     </div>
+//                   </Col>
+
+//                   <Col flex="auto">
+//                     <Space direction="vertical" size="small" style={{ width: '100%' }}>
+//                       <Space wrap>
+//                         <Text strong style={{ fontSize: 16 }}>{action.name}</Text>
+//                         <Tag color={actionInfo.color}>
+//                           {actionInfo.label}
+//                         </Tag>
+//                         {!action.is_enabled && (
+//                           <Tag>Disabled</Tag>
+//                         )}
+//                       </Space>
+//                       <Text type="secondary">{actionInfo.description}</Text>
+                      
+//                       {/* Configuration Preview */}
+//                       <div>
+//                         {action.action_type === 'send_email' && action.configuration.templateId && (
+//                           <Text type="secondary" style={{ fontSize: 12 }}>
+//                             Template: {action.configuration.templateId}
+//                           </Text>
+//                         )}
+//                         {action.action_type === 'assign_owner' && action.configuration.field && (
+//                           <Text type="secondary" style={{ fontSize: 12 }}>
+//                             Field: {action.configuration.field}
+//                           </Text>
+//                         )}
+//                       </div>
+//                     </Space>
+//                   </Col>
+
+//                   <Col flex="none">
+//                     <Space>
+//                       <Button
+//                         type="text"
+//                         icon={<EditOutlined />}
+//                         onClick={() => handleEditAction(action)}
+//                       />
+//                       <Button
+//                         type="text"
+//                         danger
+//                         icon={<DeleteOutlined />}
+//                         onClick={() => removeAction(action.id!)}
+//                       />
+//                     </Space>
+//                   </Col>
+//                 </Row>
+//               </Card>
+//             );
+//           })}
+//         </Space>
+//       )}
+
+//       <Drawer
+//         title={editingAction ? 'Edit Action' : 'Create New Action'}
+//         width="60%"
+//         open={drawerOpen}
+//         onClose={() => {
+//           setDrawerOpen(false);
+//           setEditingAction(null);
+//         }}
+//         destroyOnClose
+//       >
+//         <ActionConfigModal
+//           visible={drawerOpen}
+//           onClose={() => {
+//             setDrawerOpen(false);
+//             setEditingAction(null);
+//           }}
+//           onSave={handleSaveAction}
+//           action={editingAction}
+//           workflow={workflow}
+//           availableTables={availableTables}
+//           emailTemplates={emailTemplates}
+//           teams={teams}
+//         />
+//       </Drawer>
+//     </Space>
+//   );
+// }
+
+
+
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit, Mail, UserCheck, Tag, Activity, Database, Workflow, GripVertical } from 'lucide-react';
-import { ActionConfigModal } from './ActionConfigModal';
+import { Button, Card, Row, Col, Typography, Space, Tag, Empty, Drawer } from 'antd';
+import { 
+  PlusOutlined, 
+  DeleteOutlined, 
+  EditOutlined, 
+  MailOutlined, 
+  UserSwitchOutlined, 
+  TagOutlined, 
+  ThunderboltOutlined, 
+  DatabaseOutlined, 
+  BranchesOutlined, 
+  ArrowUpOutlined,
+  ArrowDownOutlined
+} from '@ant-design/icons';
+import ActionConfigModal from './ActionConfigModal';
 import type { WorkflowAction, WorkflowRule, ViewConfig, EmailTemplate, Team } from '../../lib/types';
+
+const { Title, Paragraph, Text } = Typography;
 
 interface WorkflowActionsProps {
   actions: WorkflowAction[];
@@ -20,44 +332,46 @@ export function WorkflowActions({
   emailTemplates, 
   teams 
 }: WorkflowActionsProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAction, setEditingAction] = useState<WorkflowAction | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const actionTypes = [
-    { value: 'send_email', label: 'Send Email', description: 'Send an email notification', icon: Mail, color: 'blue' },
-    { value: 'assign_owner', label: 'Assign Owner', description: 'Assign record to a user or team', icon: UserCheck, color: 'green' },
-    { value: 'update_fields', label: 'Update Fields', description: 'Update specific fields in the record', icon: Edit, color: 'purple' },
-    { value: 'add_tags', label: 'Add Tags', description: 'Add tags to the record', icon: Tag, color: 'orange' },
-    { value: 'create_activity', label: 'Create Activity', description: 'Create a follow-up activity', icon: Activity, color: 'indigo' },
-    { value: 'create_record', label: 'Create Record', description: 'Create a new record in another table', icon: Database, color: 'teal' },
-    { value: 'trigger_workflow_event', label: 'Trigger Workflow', description: 'Trigger another workflow', icon: Workflow, color: 'pink' },
+    { value: 'send_email', label: 'Send Email', description: 'Send an email notification', icon: MailOutlined, color: 'blue' },
+    { value: 'assign_owner', label: 'Assign Owner', description: 'Assign record to a user or team', icon: UserSwitchOutlined, color: 'green' },
+    { value: 'update_fields', label: 'Update Fields', description: 'Update specific fields in the record', icon: EditOutlined, color: 'purple' },
+    { value: 'add_tags', label: 'Add Tags', description: 'Add tags to the record', icon: TagOutlined, color: 'orange' },
+    { value: 'create_activity', label: 'Create Activity', description: 'Create a follow-up activity', icon: ThunderboltOutlined, color: 'cyan' },
+    { value: 'create_record', label: 'Create Record', description: 'Create a new record in another table', icon: DatabaseOutlined, color: 'geekblue' },
+    { value: 'trigger_workflow_event', label: 'Trigger Workflow', description: 'Trigger another workflow', icon: BranchesOutlined, color: 'magenta' },
   ];
 
   const getActionTypeInfo = (type: string) => {
     return actionTypes.find(at => at.value === type) || actionTypes[0];
   };
 
-  const addAction = () => {
+  const handleAddAction = () => {
     setEditingAction(null);
-    setIsModalOpen(true);
+    setDrawerOpen(true);
   };
 
-  const editAction = (action: WorkflowAction) => {
+  const handleEditAction = (action: WorkflowAction) => {
     setEditingAction(action);
-    setIsModalOpen(true);
+    setDrawerOpen(true);
   };
 
   const handleSaveAction = (actionData: Partial<WorkflowAction>) => {
-    if (editingAction) {
+    // Check if the action being saved already exists
+    const existingActionIndex = actions.findIndex(a => a.id === actionData.id);
+
+    if (existingActionIndex !== -1) {
       // Update existing action
-      const updatedActions = actions.map(action => 
-        action.id === editingAction.id ? { ...action, ...actionData } : action
-      );
+      const updatedActions = [...actions];
+      updatedActions[existingActionIndex] = { ...updatedActions[existingActionIndex], ...actionData };
       onUpdate(updatedActions);
     } else {
-      // Add new action
+      // Create new action
       const newAction: WorkflowAction = {
-        id: `temp-${Date.now()}`,
+        id: `temp-${Date.now()}`, // Assign a temporary ID for new actions
         action_type: actionData.action_type!,
         configuration: actionData.configuration || {},
         action_order: actions.length + 1,
@@ -65,12 +379,12 @@ export function WorkflowActions({
         max_retries: 3,
         is_enabled: true,
         organization_id: workflow.organization_id!,
-        name: actionData.name || `${actionData.action_type} Action`,
+        name: actionData.name || `${getActionTypeInfo(actionData.action_type!).label} Action`,
         ...actionData,
       };
       onUpdate([...actions, newAction]);
     }
-    setIsModalOpen(false);
+    setDrawerOpen(false);
     setEditingAction(null);
   };
 
@@ -82,16 +396,15 @@ export function WorkflowActions({
   };
 
   const moveAction = (actionId: string, direction: 'up' | 'down') => {
-    const currentIndex = actions.findIndex(action => action.id === actionId);
+    const newActions = [...actions];
+    const currentIndex = newActions.findIndex(action => action.id === actionId);
     if (currentIndex === -1) return;
 
     const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex < 0 || newIndex >= actions.length) return;
+    if (newIndex < 0 || newIndex >= newActions.length) return;
 
-    const newActions = [...actions];
     [newActions[currentIndex], newActions[newIndex]] = [newActions[newIndex], newActions[currentIndex]];
     
-    // Update action_order
     const reorderedActions = newActions.map((action, index) => ({
       ...action,
       action_order: index + 1,
@@ -101,136 +414,181 @@ export function WorkflowActions({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">Workflow Actions</h3>
-          <p className="text-gray-600 mt-1">
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <Row justify="space-between" align="middle">
+        <Col>
+          <Title level={4} style={{ margin: 0 }}>Workflow Actions</Title>
+          <Text type="secondary">
             Define what happens when this workflow triggers. Actions run in order.
-          </p>
-        </div>
-        <button
-          onClick={addAction}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Action
-        </button>
-      </div>
+          </Text>
+        </Col>
+        <Col>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleAddAction}
+          >
+            Add Action
+          </Button>
+        </Col>
+      </Row>
 
       {actions.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-          <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h4 className="text-lg font-medium text-gray-900 mb-2">No Actions Configured</h4>
-          <p className="text-gray-600 mb-4">
-            Add actions to define what happens when this workflow triggers
-          </p>
-          <button
-            onClick={addAction}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
+        <Empty
+          image={<ThunderboltOutlined style={{ fontSize: 64, color: '#d9d9d9' }} />}
+          description={
+            <div>
+              <Title level={4}>No Actions Configured</Title>
+              <Paragraph type="secondary">
+                Add actions to define what happens when this workflow triggers
+              </Paragraph>
+            </div>
+          }
+        >
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleAddAction}
           >
-            <Plus className="w-4 h-4" />
             Add First Action
-          </button>
-        </div>
+          </Button>
+        </Empty>
       ) : (
-        <div className="space-y-3">
-          {actions.map((action, index) => {
-            const actionInfo = getActionTypeInfo(action.action_type);
-            const Icon = actionInfo.icon;
-            
-            return (
-              <div key={action.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-4">
-                  {/* Drag Handle */}
-                  <div className="flex flex-col gap-1">
-                    <button
-                      onClick={() => moveAction(action.id!, 'up')}
-                      disabled={index === 0}
-                      className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      <GripVertical className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => moveAction(action.id!, 'down')}
-                      disabled={index === actions.length - 1}
-                      className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      <GripVertical className="w-4 h-4" />
-                    </button>
-                  </div>
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          {actions
+            .sort((a, b) => (a.action_order || 0) - (b.action_order || 0))
+            .map((action, index) => {
+              const actionInfo = getActionTypeInfo(action.action_type);
+              const Icon = actionInfo.icon;
+              
+              return (
+                <Card key={action.id} size="small" hoverable>
+                  <Row align="middle" gutter={16}>
+                    <Col flex="none">
+                      <Space direction="vertical" size="small">
+                        <Button
+                          type="text"
+                          icon={<ArrowUpOutlined />}
+                          onClick={() => moveAction(action.id!, 'up')}
+                          disabled={index === 0}
+                          size="small"
+                        />
+                        <Button
+                          type="text"
+                          icon={<ArrowDownOutlined />}
+                          onClick={() => moveAction(action.id!, 'down')}
+                          disabled={index === actions.length - 1}
+                          size="small"
+                        />
+                      </Space>
+                    </Col>
 
-                  {/* Order Badge */}
-                  <div className="bg-gray-100 text-gray-700 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium">
-                    {action.action_order}
-                  </div>
+                    <Col flex="none">
+                      <div style={{
+                        background: '#f0f0f0',
+                        color: '#666',
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 14,
+                        fontWeight: 500
+                      }}>
+                        {action.action_order}
+                      </div>
+                    </Col>
 
-                  {/* Action Icon */}
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-${actionInfo.color}-100`}>
-                    <Icon className={`w-5 h-5 text-${actionInfo.color}-600`} />
-                  </div>
+                    <Col flex="none">
+                      <div style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: `var(--ant-color-${actionInfo.color}-1)`
+                      }}>
+                        <Icon style={{ fontSize: 20, color: `var(--ant-color-${actionInfo.color}-6)` }} />
+                      </div>
+                    </Col>
 
-                  {/* Action Details */}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-medium text-gray-900">{action.name}</h4>
-                      <span className={`px-2 py-1 text-xs rounded-full bg-${actionInfo.color}-100 text-${actionInfo.color}-700`}>
-                        {actionInfo.label}
-                      </span>
-                      {!action.is_enabled && (
-                        <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
-                          Disabled
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600">{actionInfo.description}</p>
-                    
-                    {/* Configuration Preview */}
-                    <div className="mt-2 text-xs text-gray-500">
-                      {action.action_type === 'send_email' && action.configuration.templateId && (
-                        <span>Template: {action.configuration.templateId}</span>
-                      )}
-                      {action.action_type === 'assign_owner' && action.configuration.field && (
-                        <span>Field: {action.configuration.field}</span>
-                      )}
-                    </div>
-                  </div>
+                    <Col flex="auto">
+                      <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                        <Space wrap>
+                          <Text strong style={{ fontSize: 16 }}>{action.name}</Text>
+                          <Tag color={actionInfo.color}>
+                            {actionInfo.label}
+                          </Tag>
+                          {!action.is_enabled && (
+                            <Tag>Disabled</Tag>
+                          )}
+                        </Space>
+                        <Text type="secondary">{actionInfo.description}</Text>
+                        
+                        {/* Configuration Preview */}
+                        <div>
+                          {action.action_type === 'send_email' && action.configuration.templateId && (
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              Template: {emailTemplates.find(t => t.id === action.configuration.templateId)?.name || action.configuration.templateId}
+                            </Text>
+                          )}
+                          {action.action_type === 'assign_owner' && action.configuration.field && (
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              Field: {action.configuration.field}
+                            </Text>
+                          )}
+                        </div>
+                      </Space>
+                    </Col>
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => editAction(action)}
-                      className="text-gray-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => removeAction(action.id!)}
-                      className="text-gray-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                    <Col flex="none">
+                      <Space>
+                        <Button
+                          type="text"
+                          icon={<EditOutlined />}
+                          onClick={() => handleEditAction(action)}
+                        />
+                        <Button
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={() => removeAction(action.id!)}
+                        />
+                      </Space>
+                    </Col>
+                  </Row>
+                </Card>
+              );
+            })}
+        </Space>
       )}
 
-      <ActionConfigModal
-        isOpen={isModalOpen}
+      <Drawer
+        title={editingAction ? 'Edit Action' : 'Create New Action'}
+        width="60%"
+        open={drawerOpen}
         onClose={() => {
-          setIsModalOpen(false);
+          setDrawerOpen(false);
           setEditingAction(null);
         }}
-        onSave={handleSaveAction}
-        action={editingAction}
-        workflow={workflow}
-        availableTables={availableTables}
-        emailTemplates={emailTemplates}
-        teams={teams}
-      />
-    </div>
+        destroyOnClose
+      >
+        <ActionConfigModal
+          visible={drawerOpen}
+          onClose={() => {
+            setDrawerOpen(false);
+            setEditingAction(null);
+          }}
+          onSave={handleSaveAction}
+          action={editingAction}
+          workflow={workflow}
+          availableTables={availableTables}
+          emailTemplates={emailTemplates}
+          teams={teams}
+        />
+      </Drawer>
+    </Space>
   );
 }

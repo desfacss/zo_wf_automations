@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Mail, UserCheck, Tag, Edit, Activity, Database, Workflow, Plus } from 'lucide-react';
+import { Form, Input, InputNumber, Select, Radio, Card, Row, Col, Typography, Space, Button, Switch, Alert } from 'antd';
+import { SaveOutlined, MailOutlined, UserSwitchOutlined, TagOutlined, EditOutlined, ThunderboltOutlined, DatabaseOutlined, BranchesOutlined } from '@ant-design/icons';
 import { EmailActionConfig } from './actions/EmailActionConfig';
 import { AssignOwnerActionConfig } from './actions/AssignOwnerActionConfig';
 import { UpdateFieldsActionConfig } from './actions/UpdateFieldsActionConfig';
 import type { WorkflowAction, WorkflowRule, ViewConfig, EmailTemplate, Team } from '../../lib/types';
 
+const { Title, Paragraph, Text } = Typography;
+
 interface ActionConfigModalProps {
-  isOpen: boolean;
+  visible?: boolean;
   onClose: () => void;
   onSave: (action: Partial<WorkflowAction>) => void;
+  onCancel?: () => void;
   action?: WorkflowAction | null;
   workflow: Partial<WorkflowRule>;
   availableTables: ViewConfig[];
@@ -16,16 +20,18 @@ interface ActionConfigModalProps {
   teams: Team[];
 }
 
-export function ActionConfigModal({
-  isOpen,
+export default function ActionConfigModal({
+  visible = true,
   onClose,
   onSave,
+  onCancel,
   action,
   workflow,
   availableTables,
   emailTemplates,
   teams,
 }: ActionConfigModalProps) {
+  const [form] = Form.useForm();
   const [actionData, setActionData] = useState<Partial<WorkflowAction>>({
     action_type: 'send_email',
     configuration: {},
@@ -35,40 +41,57 @@ export function ActionConfigModal({
   });
 
   const actionTypes = [
-    { value: 'send_email', label: 'Send Email', description: 'Send an email notification', icon: Mail },
-    { value: 'assign_owner', label: 'Assign Owner', description: 'Assign record to a user or team', icon: UserCheck },
-    { value: 'update_fields', label: 'Update Fields', description: 'Update specific fields in the record', icon: Edit },
-    { value: 'add_tags', label: 'Add Tags', description: 'Add tags to the record', icon: Tag },
-    { value: 'create_activity', label: 'Create Activity', description: 'Create a follow-up activity', icon: Activity },
-    { value: 'create_record', label: 'Create Record', description: 'Create a new record in another table', icon: Database },
-    { value: 'trigger_workflow_event', label: 'Trigger Workflow', description: 'Trigger another workflow', icon: Workflow },
+    { value: 'send_email', label: 'Send Email', description: 'Send an email notification', icon: MailOutlined },
+    { value: 'assign_owner', label: 'Assign Owner', description: 'Assign record to a user or team', icon: UserSwitchOutlined },
+    { value: 'update_fields', label: 'Update Fields', description: 'Update specific fields in the record', icon: EditOutlined },
+    { value: 'add_tags', label: 'Add Tags', description: 'Add tags to the record', icon: TagOutlined },
+    { value: 'create_activity', label: 'Create Activity', description: 'Create a follow-up activity', icon: ThunderboltOutlined },
+    { value: 'create_record', label: 'Create Record', description: 'Create a new record in another table', icon: DatabaseOutlined },
+    { value: 'trigger_workflow_event', label: 'Trigger Workflow', description: 'Trigger another workflow', icon: BranchesOutlined },
   ];
 
   useEffect(() => {
     if (action) {
+      const formData = {
+        ...action,
+        conditionRule: action.configuration?.condition?.rule || '',
+      };
       setActionData(action);
+      form.setFieldsValue(formData);
     } else {
-      setActionData({
+      const initialData = {
         action_type: 'send_email',
         configuration: {},
         is_enabled: true,
         max_retries: 3,
         name: '',
-      });
+      };
+      setActionData(initialData);
+      form.setFieldsValue(initialData);
     }
-  }, [action, isOpen]);
+  }, [action, form]);
 
-  const handleSave = () => {
-    if (!actionData.name || !actionData.action_type) return;
-    onSave(actionData);
+  const handleSave = (values: any) => {
+    if (!values.name || !values.action_type) return;
+    
+    const finalActionData = {
+      ...actionData,
+      ...values,
+      id: actionData.id || `temp-${Date.now()}-${Math.random()}`,
+    };
+    
+    onSave(finalActionData);
   };
 
   const handleInputChange = (field: keyof WorkflowAction, value: any) => {
-    setActionData(prev => ({ ...prev, [field]: value }));
+    const updatedData = { ...actionData, [field]: value };
+    setActionData(updatedData);
+    form.setFieldsValue({ [field]: value });
   };
 
   const handleConfigurationChange = (config: any) => {
-    setActionData(prev => ({ ...prev, configuration: config }));
+    const updatedData = { ...actionData, configuration: config };
+    setActionData(updatedData);
   };
 
   const renderActionConfiguration = () => {
@@ -105,145 +128,161 @@ export function ActionConfigModal({
         );
       default:
         return (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-yellow-800">
-              Configuration for "{actionData.action_type}" action type is not yet implemented.
-            </p>
-          </div>
+          <Alert
+            message={`Configuration for "${actionData.action_type}" action type is not yet implemented.`}
+            type="warning"
+            showIcon
+          />
         );
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="bg-gray-50 border-b border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-gray-900">
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)',
+        color: 'white',
+        padding: 24
+      }}>
+        <Space>
+          <ThunderboltOutlined style={{ fontSize: 24 }} />
+          <div>
+            <Title level={3} style={{ color: 'white', margin: 0 }}>
               {action ? 'Edit Action' : 'Configure New Action'}
-            </h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            </Title>
+            <Paragraph style={{ color: 'rgba(255,255,255,0.8)', margin: 0 }}>
+              Configure what happens when this workflow triggers
+            </Paragraph>
           </div>
-        </div>
+        </Space>
+      </div>
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-160px)]">
-          <div className="space-y-6">
+      {/* Content */}
+      <div style={{ flex: 1, padding: 24, overflow: 'auto' }}>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSave}
+          size="large"
+        >
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
             {/* Basic Info */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Action Name *
-                </label>
-                <input
-                  type="text"
-                  value={actionData.name || ''}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  placeholder="Enter action name"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+            <Card title="Basic Information" size="small">
+              <Row gutter={16}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="name"
+                    label="Action Name"
+                    rules={[{ required: true, message: 'Please enter action name' }]}
+                  >
+                    <Input
+                      placeholder="Enter action name"
+                      onChange={(e) => handleInputChange('name', e.target.value)}
+                    />
+                  </Form.Item>
+                </Col>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Max Retries
-                </label>
-                <input
-                  type="number"
-                  value={actionData.max_retries || 3}
-                  onChange={(e) => handleInputChange('max_retries', parseInt(e.target.value))}
-                  min="0"
-                  max="10"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="max_retries"
+                    label="Max Retries"
+                    help="Number of retry attempts if action fails"
+                  >
+                    <InputNumber
+                      min={0}
+                      max={10}
+                      style={{ width: '100%' }}
+                      onChange={(value) => handleInputChange('max_retries', value)}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
 
             {/* Action Type */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Action Type *
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {actionTypes.map((type) => {
-                  const Icon = type.icon;
-                  const isSelected = actionData.action_type === type.value;
-                  
-                  return (
-                    <button
-                      key={type.value}
-                      onClick={() => {
-                        handleInputChange('action_type', type.value);
-                        handleConfigurationChange({});
-                      }}
-                      className={`
-                        p-4 border-2 rounded-lg text-left transition-all
-                        ${isSelected 
-                          ? 'border-blue-500 bg-blue-50 text-blue-900' 
-                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                        }
-                      `}
-                    >
-                      <div className="flex items-start gap-3">
-                        <Icon className={`w-5 h-5 mt-0.5 ${isSelected ? 'text-blue-600' : 'text-gray-400'}`} />
-                        <div>
-                          <p className="font-medium text-sm">{type.label}</p>
-                          <p className="text-xs opacity-75 mt-1">{type.description}</p>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <Card title="Action Type" size="small">
+              <Form.Item
+                name="action_type"
+                rules={[{ required: true, message: 'Please select action type' }]}
+              >
+                <Radio.Group
+                  onChange={(e) => {
+                    handleInputChange('action_type', e.target.value);
+                    handleConfigurationChange({});
+                  }}
+                  style={{ width: '100%' }}
+                >
+                  <Row gutter={[16, 16]}>
+                    {actionTypes.map((type) => {
+                      const Icon = type.icon;
+                      return (
+                        <Col xs={24} sm={12} lg={8} key={type.value}>
+                          <Card
+                            size="small"
+                            hoverable
+                            style={{ height: '100%' }}
+                          >
+                            <Radio value={type.value} style={{ width: '100%' }}>
+                              <Space>
+                                <Icon style={{ fontSize: 16, color: '#1890ff' }} />
+                                <div>
+                                  <Text strong>{type.label}</Text>
+                                  <br />
+                                  <Text type="secondary" style={{ fontSize: 12 }}>
+                                    {type.description}
+                                  </Text>
+                                </div>
+                              </Space>
+                            </Radio>
+                          </Card>
+                        </Col>
+                      );
+                    })}
+                  </Row>
+                </Radio.Group>
+              </Form.Item>
+            </Card>
 
             {/* Action Configuration */}
-            <div>
-              <h4 className="text-lg font-medium text-gray-900 mb-4">Action Configuration</h4>
+            <Card title="Action Configuration" size="small">
               {renderActionConfiguration()}
-            </div>
+            </Card>
 
             {/* Enable/Disable */}
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="is_enabled"
-                checked={actionData.is_enabled || false}
-                onChange={(e) => handleInputChange('is_enabled', e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <label htmlFor="is_enabled" className="text-sm font-medium text-gray-700">
-                Enable this action
-              </label>
-            </div>
-          </div>
-        </div>
+            <Card title="Settings" size="small">
+              <Form.Item
+                name="is_enabled"
+                valuePropName="checked"
+              >
+                <Switch />
+                <Text style={{ marginLeft: 8 }}>Enable this action</Text>
+              </Form.Item>
+            </Card>
+          </Space>
+        </Form>
+      </div>
 
-        {/* Footer */}
-        <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-          >
+      {/* Footer */}
+      <div style={{
+        background: '#fafafa',
+        borderTop: '1px solid #f0f0f0',
+        padding: '16px 24px',
+        display: 'flex',
+        justifyContent: 'flex-end'
+      }}>
+        <Space>
+          <Button onClick={onCancel || onClose}>
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!actionData.name || !actionData.action_type}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          </Button>
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
+            onClick={() => form.submit()}
           >
-            <Save className="w-4 h-4" />
             Save Action
-          </button>
-        </div>
+          </Button>
+        </Space>
       </div>
     </div>
   );

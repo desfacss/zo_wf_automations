@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, MapPin, Calendar, Search, RefreshCw } from 'lucide-react';
+import { BuildingOutlined, EnvironmentOutlined, CalendarOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import { supabase } from '../lib/supabase';
 // import { useAuth } from '../hooks/useAuth';
 import { useAuthStore } from '../lib/store';
@@ -89,7 +89,7 @@ export function AccountsList() {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
         <div className="text-red-600 mb-4">
-          <Building2 className="w-12 h-12 mx-auto mb-2" />
+          <BuildingOutlined className="w-12 h-12 mx-auto mb-2" />
           <h3 className="text-lg font-semibold">Error Loading Accounts</h3>
           <p className="text-sm mt-1">{error}</p>
         </div>
@@ -97,7 +97,7 @@ export function AccountsList() {
           onClick={fetchAccounts}
           className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center gap-2 mx-auto"
         >
-          <RefreshCw className="w-4 h-4" />
+          <ReloadOutlined className="w-4 h-4" />
           Try Again
         </button>
       </div>
@@ -118,13 +118,13 @@ export function AccountsList() {
           disabled={loading}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 disabled:opacity-50"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <ReloadOutlined className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </button>
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <SearchOutlined className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
         <input
           type="text"
           placeholder="Search accounts..."
@@ -136,7 +136,7 @@ export function AccountsList() {
 
       {filteredAccounts.length === 0 ? (
         <div className="text-center py-12">
-          <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <BuildingOutlined className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
             {searchTerm ? 'No matching accounts' : 'No accounts found'}
           </h3>
@@ -161,15 +161,15 @@ export function AccountsList() {
                   </h3>
                   <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
-                      <Building2 className="w-4 h-4" />
+                      <BuildingOutlined className="w-4 h-4" />
                       <span>Org: {account.organization_id}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
+                      <EnvironmentOutlined className="w-4 h-4" />
                       <span>Location: {account.location_id}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
+                      <CalendarOutlined className="w-4 h-4" />
                       <span>Created: {formatDate(account.created_at)}</span>
                     </div>
                   </div>
