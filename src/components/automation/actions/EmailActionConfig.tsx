@@ -144,185 +144,198 @@ export function EmailActionConfig({
   };
 
   const renderRecipientSelect = (field: 'to' | 'cc', label: string, required = false) => {
-    return (
-      <Form.Item
-        label={label}
-        required={required}
-        help={`Select recipient type and value for ${label.toLowerCase()}`}
-      >
-        <Row gutter={8}>
-          <Col span={8}>
+  return (
+    <Form.Item
+      label={label}
+      required={required}
+      help={`Select recipient type and value for ${label.toLowerCase()}`}
+    >
+      <Row gutter={8}>
+        <Col span={8}>
+          <Select
+            value={configuration[`${field}Type`] || 'field'}
+            onChange={(value) => {
+              const updatedConfig = {
+                ...configuration,
+                [`${field}Type`]: value,
+                [field]: '', // Reset value when type changes
+                [`_${field}TeamName`]: undefined,
+                [`_${field}RoleName`]: undefined,
+                [`_${field}UserName`]: undefined,
+              };
+              onChange(updatedConfig);
+            }}
+            placeholder="Recipient type"
+          >
+            <Select.Option value="field">Table Field</Select.Option>
+            <Select.Option value="custom_field">Custom Field</Select.Option>
+            <Select.Option value="team">Team</Select.Option>
+            <Select.Option value="role">Role</Select.Option>
+            <Select.Option value="user">User</Select.Option>
+            <Select.Option value="custom">Custom Email</Select.Option>
+          </Select>
+        </Col>
+        <Col span={16}>
+          {configuration[`${field}Type`] === 'field' && (
             <Select
-              value={configuration[`${field}Type`] || 'field'}
+              value={configuration[field] || ''}
               onChange={(value) => {
-                handleConfigChange(`${field}Type`, value);
-                handleConfigChange(field, ''); // Reset value when type changes
+                const updatedConfig = { ...configuration, [field]: value };
+                onChange(updatedConfig);
               }}
-              placeholder="Recipient type"
+              placeholder="Select email field"
+              showSearch
+              filterOption={(input, option) =>
+                (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
+              }
             >
-              <Select.Option value="field">Table Field</Select.Option>
-              <Select.Option value="custom_field">Custom Field</Select.Option>
-              <Select.Option value="team">Team</Select.Option>
-              <Select.Option value="role">Role</Select.Option>
-              <Select.Option value="user">User</Select.Option>
-              <Select.Option value="custom">Custom Email</Select.Option>
+              {emailFields.map((field) => (
+                <Select.Option key={field.key} value={`{{new.${field.key}}}`}>
+                  {field.display_name} ({`{{new.${field.key}}}`})
+                </Select.Option>
+              ))}
             </Select>
-          </Col>
-          <Col span={16}>
-            {configuration[`${field}Type`] === 'field' && (
-              <Select
-                value={configuration[field] || ''}
-                onChange={(value) => handleConfigChange(field, value)}
-                placeholder="Select email field"
-                showSearch
-                filterOption={(input, option) =>
-                  (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
-                }
-              >
-                {emailFields.map((field) => (
-                  <Select.Option key={field.key} value={`{{new.${field.key}}}`}>
-                    {field.display_name} ({`{{new.${field.key}}}`})
-                  </Select.Option>
-                ))}
-              </Select>
-            )}
+          )}
 
-            {configuration[`${field}Type`] === 'custom_field' && (
-              <Select
-                value={configuration[field] || ''}
-                onChange={(value) => handleConfigChange(field, value)}
-                placeholder="Select any field"
-                showSearch
-                filterOption={(input, option) =>
-                  (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
-                }
-              >
-                {tableMetadata.map((field) => (
-                  <Select.Option key={field.key} value={`{{new.${field.key}}}`}>
-                    {field.display_name} ({`{{new.${field.key}}}`})
-                  </Select.Option>
-                ))}
-              </Select>
-            )}
+          {configuration[`${field}Type`] === 'custom_field' && (
+            <Select
+              value={configuration[field] || ''}
+              onChange={(value) => {
+                const updatedConfig = { ...configuration, [field]: value };
+                onChange(updatedConfig);
+              }}
+              placeholder="Select any field"
+              showSearch
+              filterOption={(input, option) =>
+                (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {tableMetadata.map((field) => (
+                <Select.Option key={field.key} value={`{{new.${field.key}}}`}>
+                  {field.display_name} ({`{{new.${field.key}}}`})
+                </Select.Option>
+              ))}
+            </Select>
+          )}
 
-            {configuration[`${field}Type`] === 'team' && (
-              <Select
-                value={configuration[field] || ''}
-                onChange={(value) => {
-                  const selectedTeam = teams.find(t => t.id === value);
-                  handleConfigChange(field, value);
-                  handleConfigChange(`_${field}TeamName`, selectedTeam?.name || '');
-                }}
-                placeholder="Select team"
-                loading={loadingData}
-                showSearch
-                filterOption={(input, option) =>
-                  (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
-                }
-              >
-                {teams.map((team) => (
-                  <Select.Option key={team.id} value={team.id}>
-                    {team.name}
-                  </Select.Option>
-                ))}
-              </Select>
-            )}
+          {configuration[`${field}Type`] === 'team' && (
+            <Select
+              value={configuration[field] || ''}
+              onChange={(value) => {
+                const selectedTeam = teams.find(t => t.id === value);
+                const updatedConfig = {
+                  ...configuration,
+                  [field]: value,
+                  [`_${field}TeamName`]: selectedTeam?.name || '',
+                };
+                onChange(updatedConfig);
+              }}
+              placeholder="Select team"
+              loading={loadingData}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {teams.map((team) => (
+                <Select.Option key={team.id} value={team.id}>
+                  {team.name}
+                </Select.Option>
+              ))}
+            </Select>
+          )}
 
-            {configuration[`${field}Type`] === 'role' && (
-              <Select
-                value={configuration[field] || ''}
-                onChange={(value) => {
-                  const selectedRole = roles.find(r => r.id === value);
-                  handleConfigChange(field, value);
-                  handleConfigChange(`_${field}RoleName`, selectedRole?.name || '');
-                }}
-                placeholder="Select role"
-                loading={loadingData}
-                showSearch
-                filterOption={(input, option) =>
-                  (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
-                }
-              >
-                {roles.map((role) => (
-                  <Select.Option key={role.id} value={role.id}>
-                    {role.name}
-                  </Select.Option>
-                ))}
-              </Select>
-            )}
+          {configuration[`${field}Type`] === 'role' && (
+            <Select
+              value={configuration[field] || ''}
+              onChange={(value) => {
+                const selectedRole = roles.find(r => r.id === value);
+                const updatedConfig = {
+                  ...configuration,
+                  [field]: value,
+                  [`_${field}RoleName`]: selectedRole?.name || '',
+                };
+                onChange(updatedConfig);
+              }}
+              placeholder="Select role"
+              loading={loadingData}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {roles.map((role) => (
+                <Select.Option key={role.id} value={role.id}>
+                  {role.name}
+                </Select.Option>
+              ))}
+            </Select>
+          )}
 
-            {configuration[`${field}Type`] === 'user' && (
-              <Select
-                value={configuration[field] || ''}
-                onChange={(value) => {
-                  const selectedUser = users.find(u => u.id === value);
-                  handleConfigChange(field, value);
-                  handleConfigChange(`_${field}UserName`, selectedUser?.name || '');
-                }}
-                placeholder="Select user"
-                loading={loadingData}
-                showSearch
-                filterOption={(input, option) =>
-                  (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
-                }
-              >
-                {users.map((user) => (
-                  <Select.Option key={user.id} value={user.id}>
-                    {user.name || user.details?.email || user.id}
-                  </Select.Option>
-                ))}
-              </Select>
-            )}
+          {configuration[`${field}Type`] === 'user' && (
+            <Select
+              value={configuration[field] || ''}
+              onChange={(value) => {
+                const selectedUser = users.find(u => u.id === value);
+                const updatedConfig = {
+                  ...configuration,
+                  [field]: value,
+                  [`_${field}UserName`]: selectedUser?.name || '',
+                };
+                onChange(updatedConfig);
+              }}
+              placeholder="Select user"
+              loading={loadingData}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {users.map((user) => (
+                <Select.Option key={user.id} value={user.id}>
+                  {user.name || user.details?.email || user.id}
+                </Select.Option>
+              ))}
+            </Select>
+          )}
 
-            {configuration[`${field}Type`] === 'custom' && (
-              <Select
-                mode="tags"
-                value={configuration[field] ? configuration[field].split(',').filter(Boolean) : []}
-                onChange={(value) => handleConfigChange(field, Array.isArray(value) ? value.join(',') : value)}
-                placeholder="Enter email address"
-                tokenSeparators={[',']}
-                style={{ width: '100%' }}
-              >
-                {/* Allow custom email input */}
-              </Select>
-            )}
+          {configuration[`${field}Type`] === 'custom' && (
+            <Select
+              mode="tags"
+              value={configuration[field] ? configuration[field].split(',').filter(Boolean) : []}
+              onChange={(value) => {
+                const updatedConfig = {
+                  ...configuration,
+                  [field]: Array.isArray(value) ? value.join(',') : value,
+                };
+                onChange(updatedConfig);
+              }}
+              placeholder="Enter email address"
+              tokenSeparators={[',']}
+              style={{ width: '100%' }}
+            >
+              {/* Allow custom email input */}
+            </Select>
+          )}
+        </Col>
+      </Row>
 
-            {configuration[`${field}Type`] === 'custom_field' && (
-              <Select
-                value={configuration[field] || ''}
-                onChange={(value) => handleConfigChange(field, value)}
-                placeholder="Select any field"
-                showSearch
-                filterOption={(input, option) =>
-                  (option?.children ?? '').toString().toLowerCase().includes(input.toLowerCase())
-                }
-              >
-                {tableMetadata.map((field) => (
-                  <Select.Option key={field.key} value={`{{new.${field.key}}}`}>
-                    {field.display_name} ({`{{new.${field.key}}}`})
-                  </Select.Option>
-                ))}
-              </Select>
-            )}
-          </Col>
-        </Row>
-
-        {/* Preview of selected recipient */}
-        {configuration[field] && (
-          <div style={{ marginTop: 8 }}>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {configuration[`${field}Type`] === 'field' && `Will use: ${configuration[field]}`}
-              {configuration[`${field}Type`] === 'custom_field' && `Will use: ${configuration[field]}`}
-              {configuration[`${field}Type`] === 'team' && `Team: ${configuration[`_${field}TeamName`] || 'Unknown'}`}
-              {configuration[`${field}Type`] === 'role' && `Role: ${configuration[`_${field}RoleName`] || 'Unknown'}`}
-              {configuration[`${field}Type`] === 'user' && `User: ${configuration[`_${field}UserName`] || 'Unknown'}`}
-              {configuration[`${field}Type`] === 'custom' && `Email: ${configuration[field]}`}
-            </Text>
-          </div>
-        )}
-      </Form.Item>
-    );
-  };
+      {/* Preview of selected recipient */}
+      {configuration[field] && (
+        <div style={{ marginTop: 8 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {configuration[`${field}Type`] === 'field' && `Will use: ${configuration[field]}`}
+            {configuration[`${field}Type`] === 'custom_field' && `Will use: ${configuration[field]}`}
+            {configuration[`${field}Type`] === 'team' && `Team: ${configuration[`_${field}TeamName`] || 'Unknown'}`}
+            {configuration[`${field}Type`] === 'role' && `Role: ${configuration[`_${field}RoleName`] || 'Unknown'}`}
+            {configuration[`${field}Type`] === 'user' && `User: ${configuration[`_${field}UserName`] || 'Unknown'}`}
+            {configuration[`${field}Type`] === 'custom' && `Email: ${configuration[field]}`}
+          </Text>
+        </div>
+      )}
+    </Form.Item>
+  );
+};
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
