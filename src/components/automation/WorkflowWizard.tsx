@@ -239,7 +239,7 @@ export function WorkflowWizard({ onClose, workflowId, onSave, processDefinitionI
           };
 
           const { error: actionError } = await supabase
-            .from('old-wf_actions')
+            .schema('workflow').from('wf_actions')
             .update(actionData)
             .eq('id', action.id);
 

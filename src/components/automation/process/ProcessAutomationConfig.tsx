@@ -99,7 +99,7 @@ export function ProcessAutomationConfig({ definition, onUpdate, availableTables 
     try {
       console.log('📊 Executing status update query for workflow ID:', workflowId);
       const { error } = await supabase
-        .from('old-wf_workflows')
+        .schema('workflow').from('wf_workflows')
         .update({ is_active: !isActive, updated_at: new Date().toISOString() })
         .eq('id', workflowId);
 

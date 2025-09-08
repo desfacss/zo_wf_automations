@@ -108,7 +108,7 @@ export function AutomationDashboard({ onViewLogs }: AutomationDashboardProps = {
   const deleteWorkflow = async (workflowId: string) => {
     try {
       const { error } = await supabase
-        .from('old-wf_workflows')
+        .schema('workflow').from('wf_workflows')
         .delete()
         .eq('id', workflowId);
 

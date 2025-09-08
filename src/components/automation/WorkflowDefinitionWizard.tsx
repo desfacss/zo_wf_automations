@@ -218,7 +218,7 @@ export function WorkflowDefinitionWizard({ isOpen, onClose, definitionId, onSave
       } else {
         console.log('📊 Creating new definition');
         const { data, error } = await supabase
-          .from('old-dynamic_workflow_definitions')
+          .schema('workflow').from('dynamic_workflow_definitions')
           .insert({
             ...definitionData,
             created_at: new Date().toISOString(),

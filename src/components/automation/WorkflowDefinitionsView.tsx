@@ -109,7 +109,7 @@ export function WorkflowDefinitionsView() {
   const deleteDefinition = async (definitionId: string) => {
     try {
       const { error } = await supabase
-        .from('old-dynamic_workflow_definitions')
+        .schema('workflow').from('dynamic_workflow_definitions')
         .delete()
         .eq('id', definitionId);
 

@@ -72,7 +72,7 @@ export function WorkflowDefinitionDetails({ definition, onBack, onEdit }: Workfl
 
       console.log('📊 Querying wf_workflows for workflow_definition_id:', definition.id);
       const { data: workflowsData, error: workflowsError } = await supabase
-        .from('old-wf_workflows')
+        .schema('workflow').from('wf_workflows')
         .select('*')
         .eq('workflow_definition_id', definition.id)
         .order('created_at', { ascending: false });
