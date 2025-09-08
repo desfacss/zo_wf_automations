@@ -109,7 +109,7 @@ export function WorkflowLogsView({ workflowId, workflowName, onBack, showAllLogs
       setError('');
 
       let query = supabase
-        .from('wf_logs')
+        .schema('workflow').from('wf_logs')
         .select('*')
         .eq('organization_id', user.organization_id);
 
@@ -135,7 +135,7 @@ export function WorkflowLogsView({ workflowId, workflowName, onBack, showAllLogs
 
       query = query.order('execution_time', { ascending: false });
 
-      console.log('📊 Executing workflow logs query',startDate,endDate);
+      console.log('📊 Executing workflow logs query');
       const { data, error } = await query;
 
       console.log('📊 Workflow logs query result:', { 

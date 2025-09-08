@@ -20,31 +20,31 @@ export function AutomationTabs() {
 
   const tabItems = [
     {
-      key: 'workflows',
-      label: (
-        <span>
-          <ThunderboltOutlined />
-          Event Workflows
-        </span>
-      ),
-      children: <AutomationDashboard onViewLogs={openLogsView} />,
-    },
-    {
       key: 'definitions',
       label: (
         <span>
           <BranchesOutlined />
-          Process Definitions
+          {" "}Process Definitions
         </span>
       ),
       children: <WorkflowDefinitionsView />,
+    },
+    {
+      key: 'workflows',
+      label: (
+        <span>
+          <ThunderboltOutlined />
+          {" "}Workflow Automation
+        </span>
+      ),
+      children: <AutomationDashboard onViewLogs={openLogsView} />,
     },
     {
       key: 'logs',
       label: (
         <span>
           <ClockCircleOutlined />
-          Execution Logs
+          {" "}Execution Logs
         </span>
       ),
       children: <WorkflowLogsView showAllLogs={true} />,

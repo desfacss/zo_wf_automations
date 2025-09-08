@@ -87,8 +87,7 @@ export function WorkflowDefinitionsView() {
         
         if (workflowIds.length > 0) {
           const { count, error: countError } = await supabase
-            .schema('workflow')
-            .from('wf_logs')
+            .schema('workflow').from('wf_logs') 
             .select('*', { count: 'exact', head: true })
             .in('workflow_id', workflowIds);
 
