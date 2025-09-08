@@ -109,7 +109,7 @@ export function WorkflowLogsView({ workflowId, workflowName, onBack, showAllLogs
       setError('');
 
       let query = supabase
-        .from('old-wf_logs')
+        .from('wf_logs')
         .select('*')
         .eq('organization_id', user.organization_id);
 
